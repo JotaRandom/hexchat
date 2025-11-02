@@ -1,0 +1,193 @@
+/* Mac Theme for GTK3 - HexChat
+ * Converted from GTK2 gtkrc theme
+ * Copyright 2012 Xamarin Inc.
+ * Modified by HexChat
+ */
+
+/* Color definitions */
+@define-color bg_color #f5f5f5;
+@define-color fg_color #000;
+@define-color base_color #fff;
+@define-color text_color #000;
+@define-color selected_bg_color #0066FF;
+@define-color selected_fg_color #fff;
+@define-color tooltip_bg_color #fafaba;
+@define-color tooltip_fg_color #000;
+
+/* Global settings */
+* {
+    -gtk-icon-style: regular;
+}
+
+/* Default widget styling */
+window {
+    background-color: @bg_color;
+    color: @fg_color;
+}
+
+/* Text entries */
+entry {
+    background-color: @base_color;
+    color: @text_color;
+    padding: 2px;
+}
+
+entry:disabled {
+    background-color: @bg_color;
+    color: shade(@bg_color, 0.7);
+}
+
+entry:selected {
+    background-color: @selected_bg_color;
+    color: @selected_fg_color;
+}
+
+/* Buttons */
+button {
+    padding: 4px 2px;
+    min-height: 22px;
+    min-width: 70px;
+}
+
+button:disabled {
+    color: shade(@bg_color, 0.7);
+}
+
+button:active {
+    background-color: @bg_color;
+}
+
+/* Tree views */
+treeview {
+    background-color: @base_color;
+    color: @text_color;
+}
+
+treeview:selected {
+    background-color: @selected_bg_color;
+    color: @selected_fg_color;
+}
+
+treeview:disabled {
+    color: shade(@bg_color, 0.7);
+}
+
+/* Alternating row colors */
+treeview row:nth-child(odd) {
+    background-color: #f0f4f9;
+}
+
+/* Scrollbars */
+scrollbar {
+    background-color: shade(@bg_color, 0.95);
+}
+
+scrollbar slider {
+    background-color: shade(@bg_color, 0.8);
+    border-radius: 3px;
+}
+
+scrollbar slider:hover {
+    background-color: shade(@bg_color, 0.7);
+}
+
+/* Scale/Range widgets */
+scale slider {
+    min-width: 14px;
+    min-height: 14px;
+}
+
+/* Progress bars */
+progressbar {
+    background-color: shade(@bg_color, 0.9);
+}
+
+progressbar progress {
+    background-color: @selected_bg_color;
+}
+
+/* Menus */
+menu {
+    padding: 4px 0;
+    background-color: @base_color;
+}
+
+menuitem {
+    padding: 0 9px;
+}
+
+menuitem:hover {
+    background-color: @selected_bg_color;
+    color: @selected_fg_color;
+}
+
+menuitem:disabled {
+    color: shade(@bg_color, 0.7);
+}
+
+separator.horizontal {
+    padding: 0 2px;
+}
+
+/* Combo boxes */
+combobox button {
+    padding: 2px;
+}
+
+combobox arrow {
+    min-width: 12px;
+    min-height: 12px;
+}
+
+/* Expanders */
+expander arrow {
+    min-width: 8px;
+    min-height: 8px;
+}
+
+/* Tooltips */
+tooltip {
+    background-color: @tooltip_bg_color;
+    color: @tooltip_fg_color;
+    border-radius: 3px;
+    padding: 4px;
+}
+
+tooltip * {
+    background-color: transparent;
+}
+
+/* Notebook tabs */
+notebook header {
+    background-color: shade(@bg_color, 0.95);
+}
+
+notebook tab {
+    padding: 4px 8px;
+}
+
+notebook tab:checked {
+    background-color: @base_color;
+}
+
+/* Frame */
+frame border {
+    border-color: shade(@bg_color, 0.8);
+}
+
+/* Toolbar */
+toolbar {
+    padding: 2px;
+    background-color: @bg_color;
+}
+
+/* Spinbutton */
+spinbutton {
+    padding: 0;
+}
+
+spinbutton button {
+    min-height: 0;
+    min-width: 0;
+    padding: 2px 4px;
+}

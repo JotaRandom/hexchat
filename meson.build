@@ -13,14 +13,76 @@ gnome = import('gnome')
 cc = meson.get_compiler('c')
 
 
-libgio_dep = dependency('gio-2.0', version: '>= 2.36.0')
-libgmodule_dep = dependency('gmodule-2.0')
+# Required GTK3 dependencies with version checks
+libgtk_dep = dependency('gtk+-3.0', version: '>= 3.22.0',
+  required: true,
+  not_found_message: 'GTK3 development libraries not found. On Debian/Ubuntu, install libgtk-3-dev. On Fedora, install gtk3-devel. On Arch, install gtk3.'
+)
 
-libcanberra_dep = dependency('libcanberra', version: '>= 0.22',
-                             required: get_option('libcanberra'))
-dbus_glib_dep = dependency('dbus-glib-1', required: get_option('dbus'))
+# Core GTK components
+libgdk_dep = dependency('gdk-3.0', version: '>= 3.22.0', required: true)
+libgdk_pixbuf_dep = dependency('gdk-pixbuf-2.0', version: '>= 2.32.0', required: true)
+libgio_dep = dependency('gio-2.0', version: '>= 2.56.0', required: true)
+libgmodule_dep = dependency('gmodule-2.0', required: true)
+libpango_dep = dependency('pango', version: '>= 1.38.0', required: true)
+libatk_dep = dependency('atk', version: '>= 2.20.0', required: true)
+libcairo_dep = dependency('cairo', version: '>= 1.14.0', required: true)
+libglib_dep = dependency('glib-2.0', version: '>= 2.56.0', required: true)
+libgobject_dep = dependency('gobject-2.0', version: '>= 2.56.0', required: true)
 
-global_deps = []
+# Optional dependencies with proper fallbacks
+libcanberra_dep = dependency('libcanberra-gtk3', version: '>= 0.30',
+  required: get_option('libcanberra'),
+  disabler: true
+)
+
+dbus_glib_dep = dependency('dbus-glib-1',
+  required: get_option('dbus'),
+  disabler: true
+)
+
+# Plugin dependencies
+luajit_dep = dependency('', required: false)
+python3_dep = dependency('', required: false)
+perl_dep = dependency('', required: false)
+
+# Only require the dependencies if both plugin support and the specific feature are enabled
+if get_option('plugin')
+  lua_opt = get_option('with-lua')
+  if lua_opt != 'false'
+    luajit_dep = dependency(lua_opt, version: '>= 2.0.0', required: true)
+  endif
+  
+  python_opt = get_option('with-python')
+  if python_opt != 'false'
+    python3_dep = dependency(python_opt, required: true)
+  endif
+  
+  perl_opt = get_option('with-perl')
+  if perl_opt != 'false'
+    perl_dep = dependency(perl_opt, required: false)
+    if perl_dep.found()
+      config_h.set('HAVE_PERL', 1)
+    endif
+  endif
+endif
+
+# Global dependencies
+global_deps = [
+  libgtk_dep,
+  libgdk_dep,
+  libgdk_pixbuf_dep,
+  libgio_dep,
+  libgmodule_dep,
+  libpango_dep,
+  libatk_dep,
+  libcairo_dep,
+  libglib_dep,
+  libgobject_dep,
+  dependency('gthread-2.0'),
+  dependency('x11'),
+  dependency('xext')
+]
 if cc.get_id() == 'msvc'
   libssl_dep = cc.find_library('libssl')
 else
@@ -42,13 +104,21 @@ config_h.set('USE_OPENSSL', libssl_dep.found())
 config_h.set('USE_LIBCANBERRA', libcanberra_dep.found())
 config_h.set('USE_DBUS', dbus_glib_dep.found())
 config_h.set('USE_PLUGIN', get_option('plugin'))
+config_h.set('HAVE_LUA', luajit_dep.found())
+config_h.set('HAVE_PYTHON', python3_dep.found())
+config_h.set('HAVE_PERL', perl_dep.found())
 
+# GTK3 configuration
 config_h.set('G_DISABLE_SINGLE_INCLUDES', true)
+config_h.set('GDK_DISABLE_DEPRECATED', true)
 config_h.set('GTK_DISABLE_DEPRECATED', true)
 config_h.set('GTK_DISABLE_SINGLE_INCLUDES', true)
+config_h.set('GDK_PIXBUF_DISABLE_DEPRECATED', true)
 config_h.set('GDK_PIXBUF_DISABLE_SINGLE_INCLUDES', true)
-config_h.set('GLIB_VERSION_MAX_ALLOWED', 'GLIB_VERSION_2_36')
-config_h.set('GLIB_VERSION_MIN_REQUIRED', 'GLIB_VERSION_2_36')
+config_h.set('GLIB_VERSION_MAX_ALLOWED', 'GLIB_VERSION_2_56')
+config_h.set('GLIB_VERSION_MIN_REQUIRED', 'GLIB_VERSION_2_56')
+config_h.set('GDK_VERSION_MIN_REQUIRED', 'GDK_VERSION_3_22')
+config_h.set('GDK_VERSION_MAX_ALLOWED', 'GDK_VERSION_3_22')
 
 # Detected features
 config_h.set('HAVE_MEMRCHR', cc.has_function('memrchr'))
@@ -91,6 +161,34 @@ if host_machine.system() == 'windows'
     '-DNTDDI_VERSION=NTDDI_WIN7',
     '-D_WIN32_WINNT=_WIN32_WINNT_WIN7',
      language: 'c')
+  
+  # Windows-specific dependencies
+  winmm_dep = cc.find_library('winmm', required: true)
+  ws2_32_dep = cc.find_library('ws2_32', required: true)
+  shell32_dep = cc.find_library('shell32', required: true)
+  ole32_dep = cc.find_library('ole32', required: true)
+  
+  global_deps += [winmm_dep, ws2_32_dep, shell32_dep, ole32_dep]
+else
+  # Unix-specific dependencies
+  m_dep = cc.find_library('m', required: true)
+  dl_dep = cc.find_library('dl', required: true)
+  rt_dep = cc.find_library('rt', required: false)
+  
+  global_deps += [m_dep, dl_dep]
+  if rt_dep.found()
+    global_deps += rt_dep
+  endif
+  
+  # Check for X11 and related libraries
+  x11_dep = dependency('x11', required: true)
+  xext_dep = dependency('xext', required: true)
+  xi_dep = dependency('xi', required: false)
+  
+  global_deps += [x11_dep, xext_dep]
+  if xi_dep.found()
+    global_deps += xi_dep
+  endif
 endif
 
 

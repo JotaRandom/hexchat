@@ -28,7 +28,7 @@ hexchat_gtk_sources = [
   'xtext.c'
 ]
 
-gtk_dep = dependency('gtk+-2.0', version: '>= 2.24.0')
+gtk_dep = dependency('gtk+-3.0', version: '>= 3.22.0')
 hexchat_gtk_deps = [
   hexchat_common_dep,
   libgmodule_dep, # used by libsexy

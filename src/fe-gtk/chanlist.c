@@ -817,13 +817,13 @@ chanlist_opengui (server *serv, int do_refresh)
 	/* ============================================================= */
 
 	wid = gtk_label_new (_("Show only:"));
-	gtk_misc_set_alignment (GTK_MISC (wid), 0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (wid), 0);
+	gtk_label_set_yalign (GTK_LABEL (wid), 0.5);
 	gtk_table_attach (GTK_TABLE (table), wid, 0, 1, 3, 4,
-							GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 0, 0);
+						GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 0, 0);
 	gtk_widget_show (wid);
 
-	hbox = gtk_hbox_new (0, 0);
-	gtk_box_set_spacing (GTK_BOX (hbox), 9);
+	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 9);
 	gtk_table_attach (GTK_TABLE (table), hbox, 1, 2, 3, 4,
 							GTK_FILL, GTK_FILL, 0, 0);
 	gtk_widget_show (hbox);
@@ -860,13 +860,13 @@ chanlist_opengui (server *serv, int do_refresh)
 	/* ============================================================= */
 
 	wid = gtk_label_new (_("Look in:"));
-	gtk_misc_set_alignment (GTK_MISC (wid), 0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (wid), 0);
+	gtk_label_set_yalign (GTK_LABEL (wid), 0.5);
 	gtk_table_attach (GTK_TABLE (table), wid, 0, 1, 2, 3,
-							GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 0, 0);
+						GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 0, 0);
 	gtk_widget_show (wid);
 
-	hbox = gtk_hbox_new (0, 0);
-	gtk_box_set_spacing (GTK_BOX (hbox), 12);
+	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 12);
 	gtk_table_attach (GTK_TABLE (table), hbox, 1, 2, 2, 3,
 							GTK_FILL, GTK_FILL, 0, 0);
 	gtk_widget_show (hbox);
@@ -892,9 +892,10 @@ chanlist_opengui (server *serv, int do_refresh)
 	/* ============================================================= */
 
 	wid = gtk_label_new (_("Search type:"));
-	gtk_misc_set_alignment (GTK_MISC (wid), 0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (wid), 0);
+	gtk_label_set_yalign (GTK_LABEL (wid), 0.5);
 	gtk_table_attach (GTK_TABLE (table), wid, 0, 1, 1, 2,
-							GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 0, 0);
+						GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 0, 0);
 	gtk_widget_show (wid);
 
 	wid = gtk_combo_box_text_new ();
@@ -911,9 +912,10 @@ chanlist_opengui (server *serv, int do_refresh)
 	/* ============================================================= */
 
 	wid = gtk_label_new (_("Find:"));
-	gtk_misc_set_alignment (GTK_MISC (wid), 0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (wid), 0);
+	gtk_label_set_yalign (GTK_LABEL (wid), 0.5);
 	gtk_table_attach (GTK_TABLE (table), wid, 0, 1, 0, 1,
-							GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 0, 0);
+						GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 0, 0);
 	gtk_widget_show (wid);
 
 	wid = gtk_entry_new ();

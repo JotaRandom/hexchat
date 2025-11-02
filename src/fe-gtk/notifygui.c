@@ -16,25 +16,37 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define GDK_DISABLE_DEPRECATED 1
+#define GTK_DISABLE_DEPRECATED 1
+
+#include <gtk/gtk.h>
+#include <glib.h>
+#include <glib/gstdio.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
+#include <stdlib.h>
 #include <time.h>
 
-#include "fe-gtk.h"
+/* GTK3 compatibility */
+#ifndef GTK_ALIGN_START
+#define GTK_ALIGN_START 0
+#define GTK_ALIGN_CENTER 1
+#define GTK_ALIGN_END 2
+#endif
 
+#include "fe-gtk.h"
 #include "../common/hexchat.h"
-#include "../common/notify.h"
-#include "../common/cfgfiles.h"
 #include "../common/fe.h"
-#include "../common/server.h"
-#include "../common/util.h"
+#include "gtkutil.h"
+
+/* Forward declarations */
+void notify_save(void);
+
 #include "../common/userlist.h"
 #include "../common/outbound.h"
 #include "gtkutil.h"
 #include "maingui.h"
-#include "palette.h"
+/* palette.h included via fe-gtk.h */
 #include "notifygui.h"
 
 
@@ -54,7 +66,9 @@ enum
 static GtkWidget *notify_window = 0;
 static GtkWidget *notify_button_opendialog;
 static GtkWidget *notify_button_remove;
+static GtkWidget *notify_button_add;
 
+static GtkWidget *notify_treeview;
 
 static void
 notify_closegui (void)
@@ -72,14 +86,27 @@ notify_treecell_property_mapper (GtkTreeViewColumn *col, GtkCellRenderer *cell,
                                  gpointer data)
 {
 	gchar *text;
-	GdkColor *colour;
+	GdkRGBA *color;
 	int model_column = GPOINTER_TO_INT (data);
+	gchar *color_str = NULL;
 
 	gtk_tree_model_get (GTK_TREE_MODEL (model), iter, 
-	                    COLOUR_COLUMN, &colour,
+	                    COLOUR_COLUMN, &color,
 	                    model_column, &text, -1);
+
+	if (color) {
+		color_str = g_strdup_printf("rgba(%d,%d,%d,%.2f)",
+		    (int)(color->red * 255),
+		    (int)(color->green * 255),
+		    (int)(color->blue * 255),
+		    color->alpha);
+	}
+
 	g_object_set (G_OBJECT (cell), "text", text, NULL);
-	g_object_set (G_OBJECT (cell), "foreground-gdk", colour, NULL);
+	if (color_str) {
+		g_object_set (G_OBJECT (cell), "foreground-rgba", color_str, NULL);
+		g_free (color_str);
+	}
 	g_free (text);
 }
 
@@ -103,38 +130,69 @@ notify_row_cb (GtkTreeSelection *sel, GtkTreeView *view)
 static GtkWidget *
 notify_treeview_new (GtkWidget *box)
 {
+	GtkWidget *treeview;
+	GtkCellRenderer *renderer;
+	GtkTreeViewColumn *column;
 	GtkListStore *store;
-	GtkWidget *view;
-	GtkTreeViewColumn *col;
-	int col_id;
 
-	store = gtk_list_store_new (N_COLUMNS,
-	                            G_TYPE_STRING,
-	                            G_TYPE_STRING,
-	                            G_TYPE_STRING,
-	                            G_TYPE_STRING,
-	                            G_TYPE_POINTER,	/* can't specify colour! */
-										 G_TYPE_POINTER
-	                           );
-	g_return_val_if_fail (store != NULL, NULL);
+	treeview = gtk_tree_view_new ();
+	gtk_tree_view_set_headers_visible (GTK_TREE_VIEW (treeview), TRUE);
+	gtk_tree_view_set_rubber_banding (GTK_TREE_VIEW (treeview), TRUE);
 
-	view = gtkutil_treeview_new (box, GTK_TREE_MODEL (store),
-	                             notify_treecell_property_mapper,
-	                             USER_COLUMN, _("Name"),
-	                             STATUS_COLUMN, _("Status"),
-	                             SERVER_COLUMN, _("Network"),
-	                             SEEN_COLUMN, _("Last Seen"), -1);
-	gtk_tree_view_column_set_expand (gtk_tree_view_get_column (GTK_TREE_VIEW (view), 0), TRUE);
+	renderer = gtk_cell_renderer_text_new ();
+	column = gtk_tree_view_column_new ();
+	gtk_tree_view_column_set_title (column, _("Name"));
+	gtk_tree_view_column_pack_start (column, renderer, TRUE);
+	gtk_tree_view_column_add_attribute (column, renderer, "text", 0);
+	gtk_tree_view_column_add_attribute (column, renderer, "foreground-rgba", 4);
+	gtk_tree_view_column_set_sort_column_id (column, 0);
+	gtk_tree_view_append_column (GTK_TREE_VIEW (treeview), column);
 
-	for (col_id=0; (col = gtk_tree_view_get_column (GTK_TREE_VIEW (view), col_id));
-	     col_id++)
-			gtk_tree_view_column_set_alignment (col, 0.5);
+	renderer = gtk_cell_renderer_text_new ();
+	column = gtk_tree_view_column_new_with_attributes (_("Status"), renderer,
+												"text", 1,
+												NULL);
+	gtk_tree_view_column_set_sort_column_id (column, 1);
+	gtk_tree_view_append_column (GTK_TREE_VIEW (treeview), column);
 
-	g_signal_connect (G_OBJECT (gtk_tree_view_get_selection (GTK_TREE_VIEW (view))),
-							"changed", G_CALLBACK (notify_row_cb), view);
+	renderer = gtk_cell_renderer_text_new ();
+	column = gtk_tree_view_column_new_with_attributes (_("Network"), renderer,
+												"text", 2,
+												NULL);
+	gtk_tree_view_column_set_sort_column_id (column, 2);
+	gtk_tree_view_append_column (GTK_TREE_VIEW (treeview), column);
 
-	gtk_widget_show (view);
-	return view;
+	renderer = gtk_cell_renderer_text_new ();
+	column = gtk_tree_view_column_new_with_attributes (_("Last Seen"), renderer,
+												"text", 3,
+												NULL);
+	gtk_tree_view_column_set_sort_column_id (column, 3);
+	gtk_tree_view_append_column (GTK_TREE_VIEW (treeview), column);
+
+	store = gtk_list_store_new (5, 
+		G_TYPE_STRING,  // Name
+		G_TYPE_STRING,  // Status
+		G_TYPE_STRING,  // Network
+		G_TYPE_STRING,  // Last Seen
+		GDK_TYPE_RGBA); // Color as GdkRGBA
+
+	gtk_tree_sortable_set_sort_func (GTK_TREE_SORTABLE (store), 0,
+								   (GtkTreeIterCompareFunc) g_utf8_collate, NULL, NULL);
+	gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (store),
+								   GTK_TREE_SORTABLE_DEFAULT_SORT_COLUMN_ID,
+								   GTK_SORT_ASCENDING);
+
+	gtk_tree_view_set_model (GTK_TREE_VIEW (treeview), GTK_TREE_MODEL (store));
+	g_object_unref (store);
+
+	g_signal_connect (G_OBJECT (gtk_tree_view_get_selection (GTK_TREE_VIEW (treeview))),
+					"changed", G_CALLBACK (notify_row_cb), treeview);
+
+	gtk_widget_show (treeview);
+
+	gtk_container_add (GTK_CONTAINER (box), treeview);
+
+	return treeview;
 }
 
 void
@@ -145,109 +203,129 @@ notify_gui_update (void)
 	GSList *list = notify_list;
 	GSList *slist;
 	gchar *name, *status, *server, *seen;
-	int online, servcount, lastseenminutes;
-	time_t lastseen;
-	char agobuf[128];
-
-	GtkListStore *store;
-	GtkTreeView *view;
+	gchar agobuf[64];
+	gboolean valid;
+	GtkTreeModel *model;
 	GtkTreeIter iter;
-	gboolean valid;	/* true if we don't need to append a new tree row */
+	GdkRGBA colors[5];
+	gint servcount;
+	time_t lastseen, now = time (NULL);
 
-	if (!notify_window)
+	if (!notify_treeview)
 		return;
 
-	view = g_object_get_data (G_OBJECT (notify_window), "view");
-	store = GTK_LIST_STORE (gtk_tree_view_get_model (view));
-	valid = gtk_tree_model_get_iter_first (GTK_TREE_MODEL (store), &iter);
+	model = gtk_tree_view_get_model (GTK_TREE_VIEW (notify_treeview));
+	valid = gtk_tree_model_get_iter_first (model, &iter);
+
+	// Convert GdkColor to GdkRGBA
+	gdk_rgba_parse (&colors[0], prefs.gui_list_color);
+	gdk_rgba_parse (&colors[1], prefs.gui_list_bg);
+	gdk_rgba_parse (&colors[2], prefs.gui_list_fg);
+	gdk_rgba_parse (&colors[3], prefs.gui_list_bg_alert);
+	gdk_rgba_parse (&colors[4], prefs.gui_list_fg_alert);
 
 	while (list)
 	{
-		notify = (struct notify *) list->data;
-		name = notify->name;
-		status = _("Offline");
-		server = "";
+		notify = list->data;
 
-		online = FALSE;
-		lastseen = 0;
-		/* First see if they're online on any servers */
-		slist = notify->server_list;
-		while (slist)
+		if (!notify->server_list)
 		{
-			servnot = (struct notify_per_server *) slist->data;
-			if (servnot->ison)
-				online = TRUE;
-			if (servnot->lastseen > lastseen)
-				lastseen = servnot->lastseen;
-			slist = slist->next;
-		}
+			/* Offline - just one line */
+			name = notify->name;
+			server = notify->networks ? notify->networks : "";
+			status = _("Offline");
 
-		if (!online)				  /* Offline on all servers */
-		{
-			if (!lastseen)
-				seen = _("Never");
-			else
+			if (notify->lastseen)
 			{
-				lastseenminutes = (int)(time (0) - lastseen) / 60;
-				if (lastseenminutes < 60) 
+				gint lastseenminutes = (now - notify->lastseen) / 60;
+				if (lastseenminutes < 2)
+					g_snprintf (agobuf, sizeof (agobuf), _("Just now"));
+				else if (lastseenminutes < 60)
 					g_snprintf (agobuf, sizeof (agobuf), _("%d minutes ago"), lastseenminutes);
 				else if (lastseenminutes < 120)
 					g_snprintf (agobuf, sizeof (agobuf), _("An hour ago"));
 				else
 					g_snprintf (agobuf, sizeof (agobuf), _("%d hours ago"), lastseenminutes / 60);
 				seen = agobuf;
+			} else {
+				seen = "";
 			}
-			if (!valid)	/* create new tree row if required */
-				gtk_list_store_append (store, &iter);
-			gtk_list_store_set (store, &iter, 0, name, 1, status,
-			                    2, server, 3, seen, 4, &colors[4], 5, NULL, -1);
-			if (valid)
-				valid = gtk_tree_model_iter_next (GTK_TREE_MODEL (store), &iter);
 
-		} else
+			if (!valid)
+				gtk_list_store_append (GTK_LIST_STORE (model), &iter);
+
+			gtk_list_store_set (GTK_LIST_STORE (model), &iter,
+				0, name,
+				1, status,
+				2, server,
+				3, seen,
+				4, &colors[4],  // Alert color for offline users
+				-1);
+
+			if (valid)
+				valid = gtk_tree_model_iter_next (model, &iter);
+		}
+		else
 		{
-			/* Online - add one line per server */
 			servcount = 0;
 			slist = notify->server_list;
-			status = _("Online");
+
 			while (slist)
 			{
-				servnot = (struct notify_per_server *) slist->data;
-				if (servnot->ison)
+				servnot = slist->data;
+				if (servcount > 0)
+					name = "";
+				else
+					name = notify->name;
+
+				server = server_get_network (servnot->server, TRUE);
+				status = _("Online");
+
+				if (servnot->lastseen)
 				{
-					if (servcount > 0)
-						name = "";
-					server = server_get_network (servnot->server, TRUE);
-
-					g_snprintf (agobuf, sizeof (agobuf), _("%d minutes ago"), (int)(time (0) - lastseen) / 60);
+					gint lastseenminutes = (now - servnot->lastseen) / 60;
+					if (lastseenminutes < 2)
+						g_snprintf (agobuf, sizeof (agobuf), _("Just now"));
+					else if (lastseenminutes < 60)
+						g_snprintf (agobuf, sizeof (agobuf), _("%d minutes ago"), lastseenminutes);
+					else if (lastseenminutes < 120)
+						g_snprintf (agobuf, sizeof (agobuf), _("An hour ago"));
+					else
+						g_snprintf (agobuf, sizeof (agobuf), _("%d hours ago"), lastseenminutes / 60);
 					seen = agobuf;
-
-					if (!valid)	/* create new tree row if required */
-						gtk_list_store_append (store, &iter);
-					gtk_list_store_set (store, &iter, 0, name, 1, status,
-					                    2, server, 3, seen, 4, &colors[3], 5, servnot, -1);
-					if (valid)
-						valid = gtk_tree_model_iter_next (GTK_TREE_MODEL (store), &iter);
-
-					servcount++;
+				} else {
+					seen = "";
 				}
+
+				if (!valid)
+					gtk_list_store_append (GTK_LIST_STORE (model), &iter);
+
+				gtk_list_store_set (GTK_LIST_STORE (model), &iter,
+					0, name,
+					1, status,
+					2, server,
+					3, seen,
+					4, &colors[3],  // Normal color for online users
+					-1);
+
+				if (valid)
+					valid = gtk_tree_model_iter_next (model, &iter);
+
+				servcount++;
 				slist = slist->next;
 			}
 		}
-		
+
 		list = list->next;
 	}
 
+	/* Remove any remaining rows */
 	while (valid)
 	{
-		GtkTreeIter old = iter;
-		/* get next iter now because removing invalidates old one */
-		valid = gtk_tree_model_iter_next (GTK_TREE_MODEL (store),
-                                      &iter);
-		gtk_list_store_remove (store, &old);
+		gboolean cont = gtk_list_store_remove (GTK_LIST_STORE (model), &iter);
+		if (!cont)
+			break;
 	}
-
-	notify_row_cb (gtk_tree_view_get_selection (view), view);
 }
 
 static void
@@ -257,7 +335,7 @@ notify_opendialog_clicked (GtkWidget * igad)
 	GtkTreeIter iter;
 	struct notify_per_server *servnot;
 
-	view = g_object_get_data (G_OBJECT (notify_window), "view");
+	view = notify_treeview;
 	if (gtkutil_treeview_get_selected (view, &iter, NPS_COLUMN, &servnot, -1))
 	{
 		if (servnot)
@@ -275,7 +353,7 @@ notify_remove_clicked (GtkWidget * igad)
 	gboolean found = FALSE;
 	char *name;
 
-	view = g_object_get_data (G_OBJECT (notify_window), "view");
+	view = notify_treeview;
 	if (gtkutil_treeview_get_selected (view, &iter, USER_COLUMN, &name, -1))
 	{
 		model = gtk_tree_view_get_model (view);
@@ -343,7 +421,7 @@ fe_notify_ask (char *nick, char *networks)
 	char *msg = _("Enter nickname to add:");
 	char buf[256];
 
-	dialog = gtk_dialog_new_with_buttons (msg, NULL, 0,
+	dialog = gtk_dialog_new_with_buttons (msg, NULL, GTK_DIALOG_MODAL,
 										GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT,
 										GTK_STOCK_OK, GTK_RESPONSE_ACCEPT,
 										NULL);
@@ -351,38 +429,43 @@ fe_notify_ask (char *nick, char *networks)
 		gtk_window_set_transient_for (GTK_WINDOW (dialog), GTK_WINDOW (parent_window));
 	gtk_window_set_position (GTK_WINDOW (dialog), GTK_WIN_POS_MOUSE);
 
-	table = gtk_table_new (2, 3, FALSE);
+	table = gtk_grid_new ();
 	gtk_container_set_border_width (GTK_CONTAINER (table), 12);
-	gtk_table_set_row_spacings (GTK_TABLE (table), 3);
-	gtk_table_set_col_spacings (GTK_TABLE (table), 8);
+	gtk_grid_set_row_spacing (GTK_GRID (table), 3);
+	gtk_grid_set_column_spacing (GTK_GRID (table), 8);
 	gtk_container_add (GTK_CONTAINER (gtk_dialog_get_content_area (GTK_DIALOG (dialog))), table);
 
 	label = gtk_label_new (msg);
-	gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 0, 1);
+	gtk_widget_set_halign (label, GTK_ALIGN_START);
+	gtk_grid_attach (GTK_GRID (table), label, 0, 0, 1, 1);
 
 	entry = gtk_entry_new ();
 	gtk_entry_set_text (GTK_ENTRY (entry), nick);
 	g_signal_connect (G_OBJECT (entry), "activate",
 						 	G_CALLBACK (notifygui_add_enter), dialog);
-	gtk_table_attach_defaults (GTK_TABLE (table), entry, 1, 2, 0, 1);
+	gtk_widget_set_hexpand (entry, TRUE);
+	gtk_grid_attach (GTK_GRID (table), entry, 1, 0, 1, 1);
 
 	g_signal_connect (G_OBJECT (dialog), "response",
 						   G_CALLBACK (notifygui_add_cb), entry);
 
 	label = gtk_label_new (_("Notify on these networks:"));
-	gtk_table_attach_defaults (GTK_TABLE (table), label, 0, 1, 2, 3);
+	gtk_widget_set_halign (label, GTK_ALIGN_START);
+	gtk_grid_attach (GTK_GRID (table), label, 0, 2, 1, 1);
 
 	wid = gtk_entry_new ();
 	g_object_set_data (G_OBJECT (entry), "net", wid);
 	g_signal_connect (G_OBJECT (wid), "activate",
 						 	G_CALLBACK (notifygui_add_enter), dialog);
 	gtk_entry_set_text (GTK_ENTRY (wid), networks ? networks : "ALL");
-	gtk_table_attach_defaults (GTK_TABLE (table), wid, 1, 2, 2, 3);
+	gtk_widget_set_hexpand (wid, TRUE);
+	gtk_grid_attach (GTK_GRID (table), wid, 1, 2, 1, 1);
 
 	label = gtk_label_new (NULL);
 	g_snprintf (buf, sizeof (buf), "<i><span size=\"smaller\">%s</span></i>", _("Comma separated list of networks is accepted."));
 	gtk_label_set_markup (GTK_LABEL (label), buf);
-	gtk_table_attach_defaults (GTK_TABLE (table), label, 1, 2, 3, 4);
+	gtk_widget_set_halign (label, GTK_ALIGN_START);
+	gtk_grid_attach (GTK_GRID (table), label, 1, 3, 1, 1);
 
 	gtk_widget_show_all (dialog);
 }
@@ -396,44 +479,57 @@ notify_add_clicked (GtkWidget * igad)
 void
 notify_opengui (void)
 {
-	GtkWidget *vbox, *bbox;
-	GtkWidget *view;
-	char buf[128];
+	GtkWidget *vbox, *hbox, *button, *sw, *content_area;
+	GtkWidget *button_box;
 
 	if (notify_window)
 	{
-		mg_bring_tofront (notify_window);
+		gtk_window_present (GTK_WINDOW (notify_window));
 		return;
 	}
 
-	g_snprintf(buf, sizeof(buf), _("Friends List - %s"), _(DISPLAY_NAME));
-	notify_window =
-		mg_create_generic_tab ("Notify", buf, FALSE, TRUE, notify_closegui, NULL, 400,
-								250, &vbox, 0);
-	gtkutil_destroy_on_esc (notify_window);
+	notify_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+	gtk_window_set_title (GTK_WINDOW (notify_window), _("User List"));
+	gtk_window_set_default_size (GTK_WINDOW (notify_window), 500, 300);
+	gtk_window_set_position (GTK_WINDOW (notify_window), GTK_WIN_POS_CENTER);
+	gtk_container_set_border_width (GTK_CONTAINER (notify_window), 5);
 
-	view = notify_treeview_new (vbox);
-	g_object_set_data (G_OBJECT (notify_window), "view", view);
-  
-	bbox = gtk_hbutton_box_new ();
-	gtk_button_box_set_layout (GTK_BUTTON_BOX (bbox), GTK_BUTTONBOX_SPREAD);
-	gtk_container_set_border_width (GTK_CONTAINER (bbox), 5);
-	gtk_box_pack_end (GTK_BOX (vbox), bbox, 0, 0, 0);
-	gtk_widget_show (bbox);
+	content_area = gtk_box_new (GTK_ORIENTATION_VERTICAL, 5);
+	gtk_container_add (GTK_CONTAINER (notify_window), content_area);
 
-	gtkutil_button (bbox, GTK_STOCK_NEW, 0, notify_add_clicked, 0,
-	                _("Add..."));
+	sw = gtk_scrolled_window_new (NULL, NULL);
+	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (sw),
+								GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+	gtk_scrolled_window_set_shadow_type (GTK_SCROLLED_WINDOW (sw),
+								GTK_SHADOW_IN);
+	gtk_box_pack_start (GTK_BOX (content_area), sw, TRUE, TRUE, 0);
 
-	notify_button_remove =
-	gtkutil_button (bbox, GTK_STOCK_DELETE, 0, notify_remove_clicked, 0,
-	                _("Remove"));
+	notify_treeview = notify_treeview_new (sw);
+	gtk_container_add (GTK_CONTAINER (sw), notify_treeview);
 
-	notify_button_opendialog =
-	gtkutil_button (bbox, NULL, 0, notify_opendialog_clicked, 0,
-	                _("Open Dialog"));
+	button_box = gtk_button_box_new (GTK_ORIENTATION_HORIZONTAL);
+	gtk_button_box_set_layout (GTK_BUTTON_BOX (button_box), GTK_BUTTONBOX_END);
+	gtk_box_set_spacing (GTK_BOX (button_box), 5);
+	gtk_box_pack_end (GTK_BOX (content_area), button_box, FALSE, FALSE, 0);
 
-	gtk_widget_set_sensitive (notify_button_opendialog, FALSE);
-	gtk_widget_set_sensitive (notify_button_remove, FALSE);
+	// Replace stock items with text and icons
+	button = gtk_button_new_with_mnemonic (_("_Close"));
+	g_signal_connect_swapped (G_OBJECT (button), "clicked",
+					  G_CALLBACK (gtk_widget_destroy), notify_window);
+	gtk_box_pack_end (GTK_BOX (button_box), button, FALSE, FALSE, 0);
+
+	button = gtk_button_new_with_mnemonic (_("_Remove"));
+	g_signal_connect (G_OBJECT (button), "clicked",
+					  G_CALLBACK (notify_remove_clicked), NULL);
+	gtk_box_pack_end (GTK_BOX (button_box), button, FALSE, FALSE, 0);
+
+	button = gtk_button_new_with_mnemonic (_("_Add"));
+	g_signal_connect (G_OBJECT (button), "clicked",
+					  G_CALLBACK (notify_add_clicked), NULL);
+	gtk_box_pack_end (GTK_BOX (button_box), button, FALSE, FALSE, 0);
+
+	g_signal_connect (G_OBJECT (notify_window), "delete-event",
+				  G_CALLBACK (gtk_widget_hide_on_delete), NULL);
 
 	notify_gui_update ();
 

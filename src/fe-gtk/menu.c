@@ -288,7 +288,7 @@ menu_quick_item (char *cmd, char *label, GtkWidget * menu, int flags,
 				if (access (path, R_OK) == 0)
 					img = gtk_image_new_from_file (path);
 				else
-					img = gtk_image_new_from_stock (icon, GTK_ICON_SIZE_MENU);
+					img = gtk_image_new_from_icon_name (icon, GTK_ICON_SIZE_MENU);
 				g_free (path);
 			}
 
@@ -1417,7 +1417,8 @@ menu_join (GtkWidget * wid, gpointer none)
 									NULL);
 	gtk_box_set_homogeneous (GTK_BOX (GTK_DIALOG (dialog)->vbox), TRUE);
 	gtk_window_set_position (GTK_WINDOW (dialog), GTK_WIN_POS_MOUSE);
-	hbox = gtk_hbox_new (TRUE, 0);
+	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+	gtk_box_set_homogeneous (GTK_BOX (hbox), TRUE);
 
 	entry = gtk_entry_new ();
 	GTK_ENTRY (entry)->editable = 0;	/* avoid auto-selection */
@@ -1896,7 +1897,7 @@ create_icon_menu (char *labeltext, void *stock_name, int is_stock)
 	GtkWidget *item, *img;
 
 	if (is_stock)
-		img = gtk_image_new_from_stock (stock_name, GTK_ICON_SIZE_MENU);
+		img = gtk_image_new_from_icon_name (stock_name, GTK_ICON_SIZE_MENU);
 	else
 		img = gtk_image_new_from_pixbuf (*((GdkPixbuf **)stock_name));
 	item = gtk_image_menu_item_new_with_mnemonic (labeltext);

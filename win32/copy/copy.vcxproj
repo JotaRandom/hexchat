@@ -30,7 +30,7 @@
     <None Include="$(DepsRoot)\bin\fribidi-0.dll" />
     <None Include="$(DepsRoot)\bin\fontconfig.dll" />
     <None Include="$(DepsRoot)\bin\gdk_pixbuf-2.0-0.dll" />
-    <None Include="$(DepsRoot)\bin\gdk-win32-2.0.dll" />
+    <None Include="$(DepsRoot)\bin\gdk-3-0.dll" />
     <None Include="$(DepsRoot)\bin\gio-2.0-0.dll" />
     <None Include="$(DepsRoot)\bin\glib-2.0-0.dll" />
     <None Include="$(DepsRoot)\bin\gmodule-2.0-0.dll" />
@@ -38,7 +38,7 @@
     <None Include="$(DepsRoot)\bin\gspawn-win$(PlatformArchitecture)-helper.exe" />
     <None Include="$(DepsRoot)\bin\gspawn-win$(PlatformArchitecture)-helper-console.exe" />
     <None Include="$(DepsRoot)\bin\gthread-2.0-0.dll" />
-    <None Include="$(DepsRoot)\bin\gtk-win32-2.0.dll" />
+    <None Include="$(DepsRoot)\bin\gtk-3-0.dll" />
     <None Include="$(DepsRoot)\bin\iconv.dll" />
     <None Include="$(DepsRoot)\bin\libcrypto*.dll" />
     <None Include="$(DepsRoot)\bin\libssl*.dll" />
@@ -66,7 +66,7 @@
     <Typelib Include="$(DepsRoot)\lib\girepository-1.0\*.typelib" />
     <None Include="$(Python3Path)\Lib\site-packages\_cffi_backend.*.pyd" />
 
-    <Engines Include="$(DepsRoot)\lib\gtk-2.0\i686-pc-vs14\engines\**\*" />
+    <Engines Include="$(DepsRoot)\lib\gtk-3.0\i686-pc-vs14\engines\**\*" />
 
     <FontConfig Include="$(DepsRoot)\etc\fonts\*"/>
 
@@ -82,7 +82,7 @@
   <Target Name="Build">
     <Copy SourceFiles="@(None)" DestinationFolder="$(HexChatRel)" />
     <Copy SourceFiles="@(FontConfig)" DestinationFolder="$(HexChatRel)\etc\fonts" />
-    <Copy SourceFiles="@(Engines)" DestinationFiles="@(Engines->'$(HexChatRel)\lib\gtk-2.0\i686-pc-vs14\engines\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(Engines)" DestinationFiles="@(Engines->'$(HexChatRel)\lib\gtk-3.0\i686-pc-vs14\engines\%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(Share)" DestinationFiles="@(Share->'$(HexChatRel)\share\%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="..\..\COPYING" DestinationFolder="$(HexChatRel)\share\doc\hexchat" />
     <Copy SourceFiles="$(WinSparklePath)\COPYING" DestinationFolder="$(HexChatRel)\share\doc\WinSparkle" />

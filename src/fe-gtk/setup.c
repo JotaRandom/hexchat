@@ -695,7 +695,8 @@ setup_headlabel (GtkWidget *tab, int row, int col, char *text)
 
 	label = gtk_label_new (NULL);
 	gtk_label_set_markup (GTK_LABEL (label), buf);
-	gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	gtk_table_attach (GTK_TABLE (tab), label, col, col + 1, row, row + 1, 0, 0, 4, 0);
 }
 
@@ -716,13 +717,14 @@ setup_create_3oggle (GtkWidget *tab, int row, const setting *set)
 	int *offsets = (int *)set->list;
 
 	label = gtk_label_new (_(set->label));
-	gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	if (set->tooltip)
 	{
 		gtk_widget_set_tooltip_text (label, _(set->tooltip));
 	}
 	gtk_table_attach (GTK_TABLE (tab), label, 2, 3, row, row + 1,
-							GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, LABEL_INDENT, 0);
+						GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, LABEL_INDENT, 0);
 
 	wid = gtk_check_button_new ();
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (wid),
@@ -1527,7 +1529,8 @@ setup_create_color_page (void)
 	GtkWidget *tab, *box, *label;
 	int i;
 
-	box = gtk_vbox_new (FALSE, 0);
+	box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+	gtk_box_set_homogeneous (GTK_BOX (box), FALSE);
 	gtk_container_set_border_width (GTK_CONTAINER (box), 6);
 
 	tab = gtk_table_new (9, 2, FALSE);
@@ -1769,11 +1772,13 @@ setup_create_sound_page (void)
 	GtkWidget *sound_play;
 	GtkTreeSelection *sel;
 
-	vbox1 = gtk_vbox_new (FALSE, 0);
+	vbox1 = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+	gtk_box_set_homogeneous (GTK_BOX (vbox1), FALSE);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox1), 6);
 	gtk_widget_show (vbox1);
 
-	vbox2 = gtk_vbox_new (FALSE, 0);
+	vbox2 = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+	gtk_box_set_homogeneous (GTK_BOX (vbox2), FALSE);
 	gtk_widget_show (vbox2);
 	gtk_container_add (GTK_CONTAINER (vbox1), vbox2);
 
@@ -1849,7 +1854,8 @@ setup_add_page (const char *title, GtkWidget *book, GtkWidget *tab)
 	GtkScrolledWindow *sw;
 	char buf[128];
 
-	vvbox = gtk_vbox_new (FALSE, 0);
+	vvbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+	gtk_box_set_homogeneous (GTK_BOX (vvbox), FALSE);
 
 	/* label */
 	label = gtk_label_new (NULL);
@@ -2114,7 +2120,7 @@ setup_apply_real (int new_pix, int do_ulist, int do_layout, int do_identd)
 	{
 		if (channelwin_pix)
 			g_object_unref (channelwin_pix);
-		channelwin_pix = pixmap_load_from_file (prefs.hex_text_background);
+		channelwin_pix = load_pixmap (prefs.hex_text_background);
 	}
 
 	input_style = create_input_style (input_style);
@@ -2298,11 +2304,13 @@ setup_window_open (void)
 	g_snprintf(buf, sizeof(buf), _("Preferences - %s"), _(DISPLAY_NAME));
 	win = gtkutil_window_new (buf, "prefs", 0, 600, 2);
 
-	vbox = gtk_vbox_new (FALSE, 5);
+	vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 5);
+	gtk_box_set_homogeneous (GTK_BOX (vbox), FALSE);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox), 6);
 	gtk_container_add (GTK_CONTAINER (win), vbox);
 
-	hbox = gtk_hbox_new (FALSE, 4);
+	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 4);
+	gtk_box_set_homogeneous (GTK_BOX (hbox), FALSE);
 	gtk_container_add (GTK_CONTAINER (vbox), hbox);
 
 	setup_create_tree (hbox, setup_create_pages (hbox));

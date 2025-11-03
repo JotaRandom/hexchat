@@ -147,7 +147,6 @@ typedef struct _GSList GSList;
 #define GTK_STOCK_CONVERT "gtk-convert"
 #define GTK_STOCK_FULLSCREEN "gtk-fullscreen"
 #define GTK_STOCK_LEAVE_FULLSCREEN "gtk-leave-fullscreen"
-#endif
 
 #include "../common/hexchat.h"
 #include "../common/hexchatc.h"

@@ -42,8 +42,8 @@ extern GdkPixbuf *pix_tree_util;
 extern GdkPixbuf *pix_book;
 extern GdkPixbuf *pix_hexchat;
 
-extern GdkPixmap *pixmap_load_from_file (char *file);
-extern GdkPixbuf *load_pixmap (const char *filename);
+extern Pixmap *pixmap_load_from_file (char *file);
+extern Pixbuf *load_pixmap (const char *filename);
 extern void pixmaps_init (void);
 
 #endif

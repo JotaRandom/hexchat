@@ -54,6 +54,7 @@ crash_reports/
 *.gptcache
 *.aigenerated
 .aigenerated/
+.vs/
 # Other
 *.bak
 *.tmp

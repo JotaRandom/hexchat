@@ -20,7 +20,16 @@
 #ifndef HEXCHAT_XTEXT_H
 #define HEXCHAT_XTEXT_H
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <gtk/gtk.h>
+#include <gdk/gdk.h>
+#include <cairo.h>
+#include <cairo-gobject.h>
+#include <pango/pango.h>
+#include <pango/pangocairo.h>
 
 #define GTK_TYPE_XTEXT              (gtk_xtext_get_type ())
 #define GTK_XTEXT(object)           (G_TYPE_CHECK_INSTANCE_CAST ((object), GTK_TYPE_XTEXT, GtkXText))
@@ -130,8 +139,8 @@ struct _GtkXText
 	xtext_buffer *selection_buffer;
 
 	GtkAdjustment *adj;
-	GdkPixmap *pixmap;				/* 0 = use palette[19] */
-	GdkDrawable *draw_buf;			/* points to ->window */
+	cairo_surface_t *surface;			/* Drawing surface */
+	GdkWindow *draw_buf;			/* points to ->window */
 	GdkCursor *hand_cursor;
 	GdkCursor *resize_cursor;
 
@@ -142,12 +151,12 @@ struct _GtkXText
 	int last_win_h;
 	int last_win_w;
 
-	GdkGC *bgc;						  /* backing pixmap */
-	GdkGC *fgc;						  /* text foreground color */
-	GdkGC *light_gc;				  /* sep bar */
-	GdkGC *dark_gc;
-	GdkGC *thin_gc;
-	GdkGC *marker_gc;
+	GdkRGBA fg_color;			  /* text foreground color */
+	GdkRGBA light_color;		  /* sep bar */
+	GdkRGBA dark_color;
+	GdkRGBA thin_color;
+	GdkRGBA marker_color;
+	cairo_t *cr;
 	GdkColor palette[XTEXT_COLS];
 
 	gint io_tag;					  /* for delayed refresh events */

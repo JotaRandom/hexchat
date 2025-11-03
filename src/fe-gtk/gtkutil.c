@@ -527,43 +527,59 @@ fe_get_bool (char *title, char *prompt, void *callback, void *userdata)
 }
 
 GtkWidget *
-gtkutil_button (GtkWidget *box, char *icon_name, char *tip, void *callback,
-					 void *userdata, char *labeltext)
+gtkutil_button (GtkWidget *box, const char *icon_name, const char *tip, void *callback,
+					 void *userdata, const char *labeltext)
 {
 	GtkWidget *button;
+	GtkWidget *img = NULL;
 
 	if (icon_name && *icon_name)
 	{
-		if (labeltext)
+#if GTK_CHECK_VERSION(3,0,0)
+		/* In GTK3, create image from icon name */
+		img = gtk_image_new_from_icon_name(icon_name, GTK_ICON_SIZE_BUTTON);
+#else
+		/* In GTK2, try to use stock items if possible */
+		if (g_str_has_prefix(icon_name, "gtk-"))
 		{
-			button = gtk_button_new_with_mnemonic (labeltext);
-			GtkWidget *img = gtk_image_new_from_icon_name (icon_name, GTK_ICON_SIZE_BUTTON);
-			gtk_button_set_image (GTK_BUTTON (button), img);
-		} else
+			GtkStockItem item;
+			if (gtk_stock_lookup(icon_name, &item))
+				img = gtk_image_new_from_stock(icon_name, GTK_ICON_SIZE_BUTTON);
+		}
+		if (!img)
+			img = gtk_image_new_from_icon_name(icon_name, GTK_ICON_SIZE_BUTTON);
+#endif
+
+		if (labeltext && *labeltext)
 		{
-			button = gtk_button_new ();
-			GtkWidget *img = gtk_image_new_from_icon_name (icon_name, GTK_ICON_SIZE_BUTTON);
-			gtk_button_set_image (GTK_BUTTON (button), img);
+			button = gtk_button_new_with_mnemonic(labeltext);
+			gtk_button_set_image(GTK_BUTTON(button), img);
+		}
+		else
+		{
+			button = gtk_button_new();
+			gtk_container_add(GTK_CONTAINER(button), img);
 		}
 	}
 	else
 	{
-		button = gtk_button_new_with_mnemonic (labeltext);
+		button = gtk_button_new_with_mnemonic(labeltext ? labeltext : "");
 	}
 
-	if (tip)
-		gtk_widget_set_tooltip_text (button, tip);
+	if (tip && *tip)
+		gtk_widget_set_tooltip_text(button, tip);
 
 	if (callback)
-		g_signal_connect (G_OBJECT (button), "clicked",
-				  G_CALLBACK (callback), userdata);
+	{
+		g_signal_connect(button, "clicked", G_CALLBACK(callback), userdata);
+	}
 
 	if (box)
 	{
 #if GTK_CHECK_VERSION(3,0,0)
-		gtk_box_pack_start (GTK_BOX (box), button, FALSE, FALSE, 0);
+		gtk_box_pack_start(GTK_BOX(box), button, FALSE, FALSE, 0);
 #else
-		gtk_container_add (GTK_CONTAINER (box), button);
+		gtk_container_add(GTK_CONTAINER(box), button);
 #endif
 	}
 

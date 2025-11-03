@@ -16,33 +16,77 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <stdarg.h>
+
+/* Platform-specific includes */
+#ifdef _WIN32
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#  include <io.h>
+#  include <direct.h>
+#  define stat _stat
+#  define fstat _fstat
+#  define open _open
+#  define close _close
+#  define read _read
+#  define write _write
+#  define lseek _lseek
+#  define unlink _unlink
+#  define getpid _getpid
+#  define chmod _chmod
+#  define strcasecmp _stricmp
+#  define strncasecmp _strnicmp
+#  define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+#  define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#else
+#  include <unistd.h>
+#  include <sys/stat.h>
+#  include <sys/types.h>
+#  include <fcntl.h>
+#  include <pwd.h>
+#  include <dirent.h>
+#  include <pthread.h>
+#  include <sys/time.h>
+#  include <sys/select.h>
+#  include <signal.h>
+#  include <wchar.h>
+#  include <wctype.h>
+#endif
+
+#include "config.h"
 
 #include "../common/hexchat.h"
-#include "../common/cfgfiles.h"
 #include "../common/fe.h"
-#include "../common/text.h"
-#include "../common/userlist.h"
-#include "../common/util.h"
+#include "../common/fe-windows.h"
+#include "../common/plugin.h"
+#include "../common/plugin-identify.h"
 #include "../common/hexchatc.h"
-#include "../common/outbound.h"
-#include "fe-gtk.h"
-#include "gtkutil.h"
 #include "maingui.h"
-#include "palette.h"
-#include "pixmaps.h"
-#include "menu.h"
-#include "plugin-tray.h"
+#include "gtkutil.h"
+#include "../common/cfgfiles.h"
+#include "../common/hexchat-palette.h"
+#include "../common/hexchat-plugin.h"
+#include "../common/servlist.h"
+#include "../common/url.h"
+#include "../common/notify.h"
 #include "notifications/notification-backend.h"
-
-#ifdef WIN32
-#include "../common/fe.h"
-#endif
 #include "sexy-spell-entry.h"
+
+/* GTK3 compatibility */
+#include "gtk3-compat.h"
+
+#if !GTK_CHECK_VERSION(3,0,0)
+/* GTK2 compatibility */
+typedef GtkStyle *GtkStyle;
+#else
+/* GTK3+ */
+typedef GtkStyleContext *GtkStyle;
+#endif
 
 GtkStyle *create_input_style (GtkStyle *);
 
@@ -2316,17 +2360,17 @@ setup_window_open (void)
 	setup_create_tree (hbox, setup_create_pages (hbox));
 
 	/* prepare the button box */
-	hbbox = gtk_hbutton_box_new ();
+	hbbox = gtk_button_box_new (GTK_ORIENTATION_HORIZONTAL);
 	gtk_button_box_set_layout (GTK_BUTTON_BOX (hbbox), GTK_BUTTONBOX_END);
 	gtk_box_set_spacing (GTK_BOX (hbbox), 4);
 	gtk_box_pack_end (GTK_BOX (vbox), hbbox, FALSE, FALSE, 0);
 
-	cancel_button = wid = gtk_button_new_from_stock (GTK_STOCK_CANCEL);
+	cancel_button = wid = gtk_button_new_with_mnemonic (_("_Cancel"));
 	g_signal_connect (G_OBJECT (wid), "clicked",
 							G_CALLBACK (gtkutil_destroy), win);
 	gtk_box_pack_start (GTK_BOX (hbbox), wid, FALSE, FALSE, 0);
 
-	wid = gtk_button_new_from_stock (GTK_STOCK_OK);
+	wid = gtk_button_new_with_mnemonic (_("_OK"));
 	g_signal_connect (G_OBJECT (wid), "clicked",
 							G_CALLBACK (setup_ok_cb), win);
 	gtk_box_pack_start (GTK_BOX (hbbox), wid, FALSE, FALSE, 0);

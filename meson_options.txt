@@ -1,6 +1,39 @@
+# Core options
+option('plugin', type: 'boolean', value: true,
+  description: 'Build with plugin support'
+)
+
+# Language bindings
+option('with-lua', type: 'string', value: 'luajit',
+  description: 'Lua implementation to use (luajit or lua)'
+)
+option('with-python', type: 'string', value: 'python3-embed',
+  description: 'Python implementation to use'
+)
+option('with-perl', type: 'string', value: 'perl',
+  description: 'Perl scripting plugin, value is path to perl executable or "false"'
+)
+option('perl-path', type: 'string', value: '',
+  description: 'Custom path to Perl installation (e.g., /usr/share/perl5)'
+)
+option('with-perl-legacy-api', type: 'boolean', value: false,
+  description: 'Enables the legacy IRC perl module for compatibility with old scripts'
+)
+
+# Features
+option('with-tls', type: 'string', value: 'openssl',
+  description: 'TLS backend to use (openssl, gnutls, or none)'
+)
+option('with-libcanberra', type: 'boolean', value: true,
+  description: 'Build with libcanberra sound support (Unix only)'
+)
+option('with-dbus', type: 'boolean', value: true,
+  description: 'Build with D-Bus support (Unix only)'
+)
+
 # Applications
-option('gtk-frontend', type: 'boolean',
-  description: 'Main graphical interface'
+option('gtk-frontend', type: 'boolean', value: true,
+  description: 'Main graphical interface (GTK+)'
 )
 option('text-frontend', type: 'boolean', value: false,
   description: 'Text interface (not generally useful)'
@@ -9,25 +42,11 @@ option('theme-manager', type: 'boolean', value: false,
   description: 'Utility to help manage themes, requires mono/.net'
 )
 
-# Features
-option('tls', type: 'feature', value: 'enabled',
-  description: 'Support for TLS connections, requires openssl'
-)
-option('plugin', type: 'boolean',
-  description: 'Support for loadable plugins'
-)
-option('dbus', type: 'feature', value: 'auto',
-  description: 'Support used for single-instance and scripting interface, Unix only'
-)
-option('libcanberra', type: 'feature', value: 'auto',
-  description: 'Support for sound alerts, Unix only'
-)
-
 # Install options
 option('dbus-service-use-appid', type: 'boolean', value: false,
   description: 'Rename dbus service to match app-id, required for Flatpak'
 )
-option('install-appdata', type: 'boolean',
+option('install-appdata', type: 'boolean', value: true,
   description: 'Install appdata files for app stores'
 )
 option('install-plugin-metainfo', type: 'boolean', value: false,
@@ -35,33 +54,21 @@ option('install-plugin-metainfo', type: 'boolean', value: false,
 )
 
 # Plugins
-option('with-checksum', type: 'boolean',
+option('with-checksum', type: 'boolean', value: true,
   description: 'DCC checksum plugin'
 )
-option('with-exec', type: 'boolean',
+option('with-exec', type: 'boolean', value: true,
   description: '/exec plugin, Windows only'
 )
-option('with-fishlim', type: 'boolean',
+option('with-fishlim', type: 'boolean', value: true,
   description: 'Fish encryption plugin, requires openssl'
 )
-option('with-lua', type: 'string', value: 'luajit',
-  description: 'Lua scripting plugin, value is pkg-config name to use or "false"'
-)
-option('with-perl', type: 'string', value: 'perl',
-  description: 'Perl scripting plugin, value is path to perl executable or "false"'
-)
-option('with-python', type: 'string', value: 'python3',
-  description: 'Python scripting plugin. value is pkg-config name to use or "false"'
-)
-option('with-sysinfo', type: 'boolean',
+option('with-sysinfo', type: 'boolean', value: true,
   description: 'System information plugin, requires libpci on Unix'
 )
-option('with-upd', type: 'boolean',
+option('with-upd', type: 'boolean', value: true,
   description: 'Update plugin, Windows only'
 )
-option('with-winamp', type: 'boolean',
+option('with-winamp', type: 'boolean', value: true,
   description: 'Winamp plugin, Windows only'
-)
-option('with-perl-legacy-api', type: 'boolean', value: false,
-  description: 'Enables the legacy IRC perl module for compatibility with old scripts'
 )

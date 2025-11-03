@@ -27,10 +27,34 @@ common_sources = [
 
 common_sysinfo_deps = []
 
+# Define dependencies
 common_deps = [
-  libgio_dep,
-  libcanberra_dep,
-] + global_deps
+  dependency('gio-2.0'),
+  dependency('gmodule-2.0'),
+  dependency('glib-2.0'),
+]
+
+# SSL/TLS support
+libssl_dep = dependency('openssl', required: false)
+if libssl_dep.found()
+  common_deps += libssl_dep
+endif
+
+# DBus GLib support
+dbus_glib_dep = dependency('dbus-glib-1', required: false)
+
+# Add libcanberra if available
+if libcanberra_enabled
+  common_deps += dependency('libcanberra')
+endif
+
+# Add global deps if defined
+if is_variable('global_deps')
+  common_deps += global_deps
+endif
+
+# GModule dependency
+libgmodule_dep = dependency('gmodule-2.0')
 
 common_includes = [
   config_h_include,
@@ -75,18 +99,26 @@ textevents = custom_target('textevents',
 
 if libssl_dep.found()
   common_sources += 'ssl.c'
-  common_deps += libssl_dep
+  message('Building with SSL support')
 endif
 
 if dbus_glib_dep.found()
-  subdir('dbus')
-  common_deps += hexchat_dbus_dep
-  common_includes += include_directories('dbus')
+  if run_command('test', '-d', 'dbus', check: false).returncode() == 0
+    subdir('dbus')
+    if is_variable('hexchat_dbus_dep')
+      common_deps += hexchat_dbus_dep
+      common_includes += include_directories('dbus')
+      message('Building with DBus support')
+    endif
+  else
+    message('DBus directory not found, DBus support disabled')
+  endif
 endif
 
 if get_option('plugin')
   common_deps += libgmodule_dep
   install_headers('hexchat-plugin.h')
+  message('Building with plugin support')
 endif
 
 hexchat_common = static_library('hexchatcommon',
@@ -97,16 +129,19 @@ hexchat_common = static_library('hexchatcommon',
   pic: true
 )
 
+# Define GIO dependency
+libgio_dep = dependency('gio-2.0')
+
 hexchat_common_dep = declare_dependency(
   sources: [textevents] + marshal,
   link_with: hexchat_common,
   include_directories: common_includes,
   compile_args: common_cflags,
-  dependencies: libgio_dep,
+  dependencies: [libgio_dep] + common_deps,
 )
 
 hexchat_plugin_dep = declare_dependency(
   include_directories: common_includes,
   compile_args: common_cflags,
-  dependencies: global_deps,
+  dependencies: common_deps,
 )

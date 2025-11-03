@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>hexchat.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <name>HexChat</name>
+  <summary>IRC Client</summary>
+  <description>
+    <p>HexChat is an IRC client based on XChat, but unlike XChat it's completely free for both Windows and Unix-like systems.</p>
+    <p>Since XChat is open source, it's perfectly legal. For more info see the XChat FAQ. It is also completely free for any use including commercial.</p>
+    <p>Features:</p>
+    <ul>
+      <li>Python and Perl scripting support</li>
+      <li>Plugin support for C and other languages</li>
+      <li>Spell checking (with auto replacement and auto-learn dictionaries)</li>
+      <li>Multiple server/channel windows for one process</li>
+      <li>Spell checking (with auto replacement and auto-learn dictionaries)</li>
+      <li>Customizable look and feel (themes)</li>
+      <li>Auto-logging, auto-away, auto-identify</li>
+      <li>DCC file transfer with passive mode and IPv6 support</li>
+      <li>SSL/TLS connections</li>
+      <li>Proxy support (HTTP/SOCKS4/SOCKS5)</li>
+      <li>Auto-join channels on invite</li>
+      <li>Auto-reconnect with delay</li>
+      <li>Open URLs with a single click</li>
+      <li>Colored nicklist</li>
+      <li>Customizable command aliases</li>
+      <li>Advanced ignore system</li>
+      <li>Spell checking (with auto replacement and auto-learn dictionaries)</li>
+      <li>And much more!</li>
+    </ul>
+  </description>
+  <screenshots>
+    <screenshot type="default">https://hexchat.github.io/images/screenshots/hexchat.png</screenshot>
+  </screenshots>
+  <url type="homepage">https://hexchat.github.io/</url>
+  <url type="bugtracker">https://github.com/hexchat/hexchat/issues</url>
+  <url type="help">https://hexchat.readthedocs.io/</url>
+  <developer_name>The HexChat Team</developer_name>
+  <releases>
+    <release version="2.16.1" date="2023-01-01">
+      <description>
+        <p>Bugfix and maintenance release.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">intense</content_attribute>
+  </content_rating>
+  <categories>
+    <category>Network</category>
+    <category>IRC</category>
+    <category>GTK</category>
+  </categories>
+  <provides>
+    <binary>hexchat</binary>
+  </provides>
+  <launchable type="desktop-id">hexchat.desktop</launchable>
+</component>

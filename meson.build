@@ -3,17 +3,47 @@ project('hexchat',
   version: '2.16.1',
   license: 'GPL-2.0-or-later',
   default_options: [
-    'buildtype=debugoptimized',
+    'c_std=gnu99',
     'warning_level=1',
+    'buildtype=debugoptimized',
+    'default_library=static',
     'b_lundef=true',
     'b_pie=true',
     'with-python=python3-embed',
     'with-perl=perl',
     'plugin=true',
-    'c_std=gnu99'
+    'gtk-frontend=true',
+    'text-frontend=false',
+    'with-libcanberra=true',
+    'with-dbus=true',
+    'with-tls=openssl'
   ],
   meson_version: '>= 0.50.0'
 )
+
+# Initialize configuration data
+conf = configuration_data()
+
+# Set package information
+conf.set_quoted('PACKAGE_NAME', meson.project_name())
+conf.set_quoted('PACKAGE_VERSION', meson.project_version())
+conf.set_quoted('PACKAGE_STRING', '@0@ @1@'.format(meson.project_name(), meson.project_version()))
+conf.set_quoted('PACKAGE_BUGREPORT', 'https://github.com/hexchat/hexchat/issues')
+conf.set_quoted('LOCALEDIR', get_option('prefix') / get_option('localedir'))
+conf.set_quoted('LIBDIR', get_option('prefix') / get_option('libdir'))
+conf.set_quoted('DATADIR', get_option('prefix') / get_option('datadir'))
+conf.set_quoted('SYSCONFDIR', get_option('prefix') / get_option('sysconfdir'))
+conf.set_quoted('GETTEXT_PACKAGE', 'hexchat')
+conf.set_quoted('G_LOG_DOMAIN', 'hexchat')
+conf.set10('ENABLE_NLS', true)
+
+# GTK3 configuration
+conf.set10('G_DISABLE_SINGLE_INCLUDES', true)
+conf.set10('GDK_PIXBUF_DISABLE_SINGLE_INCLUDES', true)
+conf.set('GLIB_VERSION_MAX_ALLOWED', 'GLIB_VERSION_2_56')
+conf.set('GLIB_VERSION_MIN_REQUIRED', 'GLIB_VERSION_2_56')
+conf.set('GDK_VERSION_MIN_REQUIRED', 'GDK_VERSION_3_22')
+conf.set('GDK_VERSION_MAX_ALLOWED', 'GDK_VERSION_3_22')
 
 # Set C standard based on compiler
 cc = meson.get_compiler('c')
@@ -23,6 +53,46 @@ if cc.get_id() in ['gcc', 'clang']
   endif
   add_project_arguments('-std=gnu99', language: 'c')
 endif
+
+# Define global variables
+libcanberra_enabled = get_option('with-libcanberra')
+dbus_enabled = get_option('with-dbus')
+global_deps = []
+
+# Add config.h to the include directories
+config_h_include = include_directories('.')
+
+# Required dependencies
+required_deps = [
+  dependency('glib-2.0', version: '>= 2.56.0'),
+  dependency('gthread-2.0'),
+  dependency('gmodule-2.0'),
+  dependency('gmodule-export-2.0'),
+  dependency('gio-2.0'),
+  dependency('gdk-pixbuf-2.0'),
+  dependency('libxml-2.0'),
+  cc.find_library('m', required: false),
+  cc.find_library('dl', required: false)
+]
+
+# Optional dependencies
+optional_deps = []
+
+# GTK+ frontend
+gtk_enabled = get_option('gtk-frontend')
+if gtk_enabled
+  required_deps += [
+    dependency('gtk+-3.0', version: '>= 3.22.0'),
+    dependency('gdk-3.0'),
+    dependency('gtk+-unix-print-3.0')
+  ]
+endif
+
+# Text frontend
+text_enabled = get_option('text-frontend')
+
+# Plugin support
+plugin_enabled = get_option('plugin')
 
 # Get options from meson_options.txt
 plugin_enabled = get_option('plugin')
@@ -47,13 +117,6 @@ if perl_enabled and perl_path == ''
   message('Using Perl at: ' + perl_path)
 endif
 
-# Initialize configuration data
-conf = configuration_data()
-conf.set_quoted('PACKAGE_NAME', meson.project_name())
-conf.set_quoted('PACKAGE_VERSION', meson.project_version())
-conf.set_quoted('PACKAGE_STRING', '@0@ @1@'.format(meson.project_name(), meson.project_version()))
-conf.set_quoted('PACKAGE_BUGREPORT', 'https://github.com/hexchat/hexchat/issues')
-conf.set_quoted('LOCALEDIR', get_option('prefix') / get_option('localedir'))
 conf.set_quoted('LIBDIR', get_option('prefix') / get_option('libdir'))
 conf.set_quoted('DATADIR', get_option('prefix') / get_option('datadir'))
 conf.set_quoted('SYSCONFDIR', get_option('prefix') / get_option('sysconfdir'))
@@ -276,50 +339,10 @@ else
   conf.set('HAVE_GNUTLS', '0')
 endif
 
-# Check for D-Bus support
-if dbus_enabled and not is_windows
-  dbus_dep = dependency('dbus-1', version: '>= 1.0.0', required: false)
-  if dbus_dep.found()
-    conf.set('HAVE_DBUS', '1')
-    optional_deps += dbus_dep
-  else
-    warning('D-Bus not found, D-Bus support will be disabled')
-    dbus_enabled = false
-  endif
-else
-  dbus_enabled = false
-  conf.set('HAVE_DBUS', '0')
-endif
+# D-Bus support is handled in the main configuration section
 
-# Check for libcanberra
-if libcanberra_enabled and not is_windows
-  libcanberra_dep = dependency('libcanberra', required: false)
-  if libcanberra_dep.found()
-    conf.set('HAVE_LIBCANBERRA', '1')
-    optional_deps += libcanberra_dep
-  else
-    warning('libcanberra not found, sound notifications will be disabled')
-    libcanberra_enabled = false
-  endif
-else
-  libcanberra_enabled = false
-  conf.set('HAVE_LIBCANBERRA', '0')
-endif
-conf.set_quoted('PACKAGE_VERSION', meson.project_version())
-conf.set_quoted('PACKAGE_NAME', meson.project_name())
-conf.set_quoted('PACKAGE_STRING', '@0@ @1@'.format(meson.project_name(), meson.project_version()))
-conf.set_quoted('GETTEXT_PACKAGE', 'hexchat')
-conf.set_quoted('LOCALEDIR', join_paths(get_option('prefix'), get_option('datadir'), 'locale'))
-conf.set_quoted('G_LOG_DOMAIN', 'hexchat')
-conf.set10('ENABLE_NLS', true)
-
-# GTK3 configuration
-conf.set10('G_DISABLE_SINGLE_INCLUDES', true)
-conf.set10('GDK_PIXBUF_DISABLE_SINGLE_INCLUDES', true)
-conf.set('GLIB_VERSION_MAX_ALLOWED', 'GLIB_VERSION_2_56')
-conf.set('GLIB_VERSION_MIN_REQUIRED', 'GLIB_VERSION_2_56')
-conf.set('GDK_VERSION_MIN_REQUIRED', 'GDK_VERSION_3_22')
-conf.set('GDK_VERSION_MAX_ALLOWED', 'GDK_VERSION_3_22')
+# libcanberra support is handled in the main configuration section
+conf.set10('USE_LIBCANBERRA', false)
 
 # Check for Perl support
 perl_dep = dependency('', required: false)
@@ -438,128 +461,46 @@ config_inc = include_directories('.')
 
 # Add all dependencies to a single list
 all_deps = required_deps + optional_deps
-if perl_dep.found()
-  all_deps += perl_dep
-endif
-if python_dep.found()
-  all_deps += python_dep
-endif
-if lua_dep.found()
-  all_deps += lua_dep
-endif
 
 # Define common include directories
-inc = include_directories(
+inc_dirs = [
   'src/common',
   'src/fe-common',
   'src/fe-gtk',
   'src/fe-text',
-  'src/plugins',
-  'src/plugins/checksum',
-  'src/plugins/exec',
-  'src/plugins/fishlim',
-  'src/plugins/lua',
-  'src/plugins/perl',
-  'src/plugins/python',
-  'src/plugins/sysinfo',
-  'src/plugins/upd',
-  'src/plugins/winamp',
-  'src/plugins/win32',
-  'src/plugins/xdcc',
-  'src/plugins/xdcc/upd',
-  'src/plugins/xdcc/win32',
-  'src/plugins/xdcc/common',
-  'src/plugins/xdcc/checksum',
-  'src/plugins/xdcc/exec',
-  'src/plugins/xdcc/fishlim',
-  'src/plugins/xdcc/lua',
-  'src/plugins/xdcc/perl',
-  'src/plugins/xdcc/python',
-  'src/plugins/xdcc/sysinfo',
-  'src/plugins/xdcc/upd',
-  'src/plugins/xdcc/winamp',
-  'src/plugins/xdcc/win32',
-  'src/plugins/xdcc/common',
-  'src/plugins/xdcc/checksum',
-  'src/plugins/xdcc/exec',
-  'src/plugins/xdcc/fishlim',
-  'src/plugins/xdcc/lua',
-  'src/plugins/xdcc/perl',
-  'src/plugins/xdcc/python',
-  'src/plugins/xdcc/sysinfo',
-  'src/plugins/xdcc/upd',
-  'src/plugins/xdcc/winamp',
-  'src/plugins/xdcc/win32'
-)
+  'src/htm',
+  'src/libenchant_win8'
+]
 
-# Add subdirectories
-subdir('src/common')
-subdir('src/fe-common')
-
-if gtk_enabled
-  subdir('src/fe-gtk')
-endif
-
-if text_enabled
-  subdir('src/fe-text')
-endif
-
-if plugin_enabled
-  subdir('src/plugins')
-  
-  if perl_enabled
-    subdir('src/plugins/perl')
-  endif
-  
-  if python_impl != 'false'
-    subdir('src/plugins/python')
-  endif
-  
-  if lua_impl != 'false'
-    subdir('src/plugins/lua')
-  endif
-  
-  subdir('src/plugins/checksum')
-  subdir('src/plugins/exec')
-  subdir('src/plugins/fishlim')
-  subdir('src/plugins/sysinfo')
-  
-  if is_windows
-    subdir('src/plugins/upd')
-    subdir('src/plugins/winamp')
-    subdir('src/plugins/win32')
-  endif
-endif
-
-# Install data files
-install_data(
-  'data/hexchat.desktop',
-  'data/hexchat.appdata.xml',
-  'data/hexchat.png',
-  'data/hexchat.svg',
-  install_dir: join_paths(get_option('datadir'), 'applications')
-)
-
-# Install icons
-foreach size: ['16x16', '32x32', '48x48', '64x64', '128x128', '256x256', '512x512', 'scalable']
-  install_data(
-    'data/icons/hicolor/' + size + '/apps/hexchat.png',
-    install_dir: join_paths(get_option('datadir'), 'icons/hicolor', size, 'apps')
-  )
-  
-  if size == 'scalable'
-    install_data(
-      'data/icons/hicolor/scalable/apps/hexchat.svg',
-      install_dir: join_paths(get_option('datadir'), 'icons/hicolor/scalable/apps')
-    )
+# Only add include directories that exist
+inc = []
+foreach dir : inc_dirs
+  if run_command('test', '-d', dir, check: false).returncode() == 0
+    inc += include_directories(dir)
+    message('Added include directory: ' + dir)
+  else
+    warning('Include directory not found: ' + dir)
   endif
 endforeach
 
-# Install man pages
-install_man('data/man/hexchat.1')
+# Define plugin directory
+plugindir = join_paths(get_option('libdir'), 'hexchat/plugins')
 
-# Install translations
-subdir('po')
+# Add subdirectories only if they exist and contain meson.build
+subdirs = {
+  'src/common': true,
+  'src/fe-gtk': gtk_enabled,
+  'src/fe-text': text_enabled,
+  'src/htm': true,
+  'data': true
+}
+
+foreach dir, should_build : subdirs
+  if should_build and run_command('test', '-f', dir / 'meson.build', check: false).returncode() == 0
+    message('Building directory: ' + dir)
+    subdir(dir)
+  endif
+endforeach
 
 # Generate and install pkg-config file
 pkg = import('pkgconfig')
@@ -600,21 +541,6 @@ summary({
 
 message('\nConfiguration complete. Run \'ninja -C ' + meson.build_root() + '\' to build.')
 
-conf.set10('GDK_DISABLE_DEPRECATED', true)
-conf.set10('GTK_DISABLE_DEPRECATED', true)
-
-# Compiler and linker settings
-cc = meson.get_compiler('c')
-
-# Initialize feature flags to false, will be updated as we find dependencies
-conf.set10('HAVE_PERL', false)
-conf.set10('HAVE_PYTHON', false)
-conf.set10('HAVE_LUA', false)
-conf.set10('USE_OPENSSL', false)
-conf.set10('USE_LIBCANBERRA', false)
-conf.set10('USE_DBUS', false)
-conf.set10('USE_PLUGIN', false)
-
 # Required GTK3 dependencies with version checks
 libgtk_dep = dependency('gtk+-3.0', version: '>= 3.22.0',
   required: true,
@@ -632,38 +558,7 @@ libcairo_dep = dependency('cairo', version: '>= 1.14.0', required: true)
 libglib_dep = dependency('glib-2.0', version: '>= 2.56.0', required: true)
 libgobject_dep = dependency('gobject-2.0', version: '>= 2.56.0', required: true)
 
-# Handle optional dependencies
-# libcanberra
-if libcanberra_enabled
-  libcanberra_dep = dependency('libcanberra-gtk3', version: '>= 0.30', required: false)
-  if not libcanberra_dep.found()
-    libcanberra_dep = dependency('libcanberra', version: '>= 0.30', required: false)
-  endif
-  if libcanberra_dep.found()
-    conf.set10('USE_LIBCANBERRA', true)
-  else
-    warning('libcanberra not found, sound support will be limited')
-    libcanberra_dep = dependency('', required: false)
-  endif
-else
-  libcanberra_dep = dependency('', required: false)
-  message('libcanberra support disabled by configuration')
-endif
-
-# D-Bus
-if dbus_enabled
-  dbus_glib_dep = dependency('dbus-glib-1', required: false)
-  if dbus_glib_dep.found()
-    conf.set10('USE_DBUS', true)
-  else
-    warning('D-Bus support requested but not found')
-    dbus_glib_dep = dependency('', required: false)
-  endif
-else
-  dbus_glib_dep = dependency('', required: false)
-  message('D-Bus support disabled by configuration')
-endif
-
+# D-Bus configuration is already handled above
 # Set up all configuration before any configure_file calls
 
 # Initialize plugin dependencies
@@ -814,10 +709,11 @@ endif
 # OpenSSL configuration is handled in the earlier block
 
 if tls_impl == 'gnutls'
-  gnutls_dep = dependency('gnutls', required: true)
+  gnutls_dep = dependency('gnutls', version: '>= 3.0.0', required: false)
   if gnutls_dep.found()
+    conf.set('HAVE_GNUTLS', '1')
     conf.set10('USE_GNUTLS', true)
-    global_deps += gnutls_dep
+    optional_deps += gnutls_dep
     message('Using GnuTLS for TLS support')
   else
     error('GnuTLS not found but required for TLS support')

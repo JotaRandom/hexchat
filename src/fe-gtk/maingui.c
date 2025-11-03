@@ -19,6 +19,19 @@
 #define GDK_DISABLE_DEPRECATED 1
 #define GTK_DISABLE_DEPRECATED 1
 
+/* GTK3 compatibility */
+#if GTK_CHECK_VERSION(3,0,0)
+#define gtk_hbox_new(X,Y) gtk_box_new(GTK_ORIENTATION_HORIZONTAL, Y)
+#define gtk_vbox_new(X,Y) gtk_box_new(GTK_ORIENTATION_VERTICAL, Y)
+#define gtk_hpaned_new() gtk_paned_new(GTK_ORIENTATION_HORIZONTAL)
+#define gtk_vpaned_new() gtk_paned_new(GTK_ORIENTATION_VERTICAL)
+#define gtk_hseparator_new() gtk_separator_new(GTK_ORIENTATION_HORIZONTAL)
+#define gtk_vseparator_new() gtk_separator_new(GTK_ORIENTATION_VERTICAL)
+#define gdk_cursor_new(X) gdk_cursor_new_for_display(gdk_display_get_default(), X)
+#define gtk_menu_popup(menu, parent_menu_shell, parent_menu_item, func, data, button, activate_time) \
+    gtk_menu_popup_at_pointer(GTK_MENU(menu), NULL)
+#endif
+
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
 #include <cairo/cairo.h>
@@ -155,16 +168,28 @@ mg_create_tab_colors (void)
 static void
 set_window_urgency (GtkWidget *win, gboolean set)
 {
+#ifdef WIN32
 	gtk_window_set_urgency_hint (GTK_WINDOW (win), set);
+#else
+	/* On non-Windows, use the window's urgency hint */
+	gtk_window_set_urgency_hint (GTK_WINDOW (win), set);
+#endif
 }
 
 static void
 flash_window (GtkWidget *win)
 {
-#ifdef HAVE_GTK_MAC
-	gtkosx_application_attention_request (osx_app, INFO_REQUEST);
+#ifdef WIN32
+	FLASHWINFO fw;
+
+	fw.cbSize = sizeof (fw);
+	fw.hwnd = (HWND) GDK_WINDOW_HWND (gtk_widget_get_window (win));
+	fw.dwFlags = FLASHW_TRAY | FLASHW_TIMERNOFG;
+	fw.uCount = 5;
+	fw.dwTimeout = 0;
+
+	FlashWindowEx (&fw);
 #endif
-	set_window_urgency (win, TRUE);
 }
 
 static void
@@ -187,349 +212,41 @@ fe_flash_window (session *sess)
 void
 fe_set_tab_color (struct session *sess, tabcolor col)
 {
-	struct session *server_sess = sess->server->server_session;
-	int col_noflags = (col & ~FE_COLOR_ALLFLAGS);
-	int col_shouldoverride = !(col & FE_COLOR_FLAG_NOOVERRIDE);
+	session_gui *gui = sess->gui;
+	GdkRGBA *color = NULL;
 
-	if (sess->gui->is_tab && sess != current_tab)
+	switch (col)
 	{
-		switch (col_noflags)
-		{
-		case 0:	/* no particular color (theme default) */
-			sess->tab_state = TAB_STATE_NONE;
-			chan_set_color (sess->res->tab, plain_list);
-			break;
-		case 1:	/* new data has been displayed (dark red) */
-			if (col_shouldoverride || !((sess->tab_state & TAB_STATE_NEW_MSG)
-										|| (sess->tab_state & TAB_STATE_NEW_HILIGHT))) {
-				sess->tab_state = TAB_STATE_NEW_DATA;
-				chan_set_color (sess->res->tab, newdata_list);
-			}
-
-			if (chan_is_collapsed (sess->res->tab)
-				&& !((server_sess->tab_state & TAB_STATE_NEW_MSG)
-					 || (server_sess->tab_state & TAB_STATE_NEW_HILIGHT))
-				&& !(server_sess == current_tab))
-			{
-				server_sess->tab_state = TAB_STATE_NEW_DATA;
-				chan_set_color (chan_get_parent (sess->res->tab), newdata_list);
-			}
-
-			break;
-		case 2:	/* new message arrived in channel (light red) */
-			if (col_shouldoverride || !(sess->tab_state & TAB_STATE_NEW_HILIGHT)) {
-				sess->tab_state = TAB_STATE_NEW_MSG;
-				chan_set_color (sess->res->tab, newmsg_list);
-			}
-
-			if (chan_is_collapsed (sess->res->tab)
-				&& !(server_sess->tab_state & TAB_STATE_NEW_HILIGHT)
-				&& !(server_sess == current_tab))
-			{
-				server_sess->tab_state = TAB_STATE_NEW_MSG;
-				chan_set_color (chan_get_parent (sess->res->tab), newmsg_list);
-			}
-
-			break;
-		case 3:	/* your nick has been seen (blue) */
-			sess->tab_state = TAB_STATE_NEW_HILIGHT;
-			chan_set_color (sess->res->tab, nickseen_list);
-
-			if (chan_is_collapsed (sess->res->tab) && !(server_sess == current_tab))
-			{
-				server_sess->tab_state = TAB_STATE_NEW_MSG;
-				chan_set_color (chan_get_parent (sess->res->tab), nickseen_list);
-			}
-
-			break;
-		}
-		lastact_update (sess);
-		sess->last_tab_state = sess->tab_state; /* For plugins handling future prints */
-	}
-}
-
-static void
-mg_set_myself_away (session_gui *gui, gboolean away)
-{
-	GtkStyleContext *context = gtk_widget_get_style_context (gui->nick_label);
-	if (away)
-		gtk_style_context_add_class (context, "away");
-	else
-		gtk_style_context_remove_class (context, "away");
-}
-
-/* change the little icon to the left of your nickname */
-
-void
-mg_set_access_icon (session_gui *gui, GdkPixbuf *pix, gboolean away)
-{
-	if (gui->op_xpm)
-	{
-		if (pix == gtk_image_get_pixbuf (GTK_IMAGE (gui->op_xpm))) /* no change? */
-		{
-			mg_set_myself_away (gui, away);
-			return;
-		}
-
-		gtk_widget_destroy (gui->op_xpm);
-		gui->op_xpm = NULL;
-	}
-
-	if (pix && prefs.hex_gui_input_icon)
-	{
-		gui->op_xpm = gtk_image_new_from_pixbuf (pix);
-		gtk_box_pack_start (GTK_BOX (gui->nick_box), gui->op_xpm, 0, 0, 0);
-		gtk_widget_show (gui->op_xpm);
-	}
-
-	mg_set_myself_away (gui, away);
-}
-
-static gboolean
-mg_inputbox_focus (GtkWidget *widget, GdkEvent *event, session_gui *gui)
-{
-	GSList *list;
-	session *sess;
-
-	if (gui->is_tab)
-		return FALSE;
-
-	list = sess_list;
-	while (list)
-	{
-		sess = list->data;
-		if (sess->gui == gui)
-		{
-			current_sess = sess;
-			if (!sess->server->server_session)
-				sess->server->server_session = sess;
-			break;
-		}
-		list = list->next;
-	}
-
-	return FALSE;
-}
-
-void
-mg_inputbox_cb (GtkWidget *igad, session_gui *gui)
-{
-	char *cmd;
-	static int ignore = FALSE;
-	GSList *list;
-	session *sess = NULL;
-
-	if (ignore)
-		return;
-
-	cmd = SPELL_ENTRY_GET_TEXT (igad);
-	if (cmd[0] == 0)
-		return;
-
-	cmd = g_strdup (cmd);
-
-	/* avoid recursive loop */
-	ignore = TRUE;
-	SPELL_ENTRY_SET_TEXT (igad, "");
-	ignore = FALSE;
-
-	/* where did this event come from? */
-	if (gui->is_tab)
-	{
-		sess = current_tab;
-	} else
-	{
-		list = sess_list;
-		while (list)
-		{
-			sess = list->data;
-			if (sess->gui == gui)
-				break;
-			list = list->next;
-		}
-		if (!list)
-			sess = NULL;
-	}
-
-	if (sess)
-		handle_multiline (sess, cmd, TRUE, FALSE);
-
-	g_free (cmd);
-}
-
-static gboolean
-mg_spellcheck_cb (SexySpellEntry *entry, gchar *word, gpointer data)
-{
-	/* This can cause freezes on long words, nicks arn't very long anyway. */
-	if (strlen (word) > 20)
-		return TRUE;
-
-	/* Ignore anything we think is a valid url */
-	if (url_check_word (word) != 0)
-		return FALSE;
-
-	return TRUE;
-}
-
-#if 0
-static gboolean
-has_key (char *modes)
-{
-	if (!modes)
-		return FALSE;
-	/* this is a crude check, but "-k" can't exist, so it works. */
-	while (*modes)
-	{
-		if (*modes == 'k')
-			return TRUE;
-		if (*modes == ' ')
-			return FALSE;
-		modes++;
-	}
-	return FALSE;
-}
-#endif
-
-void
-fe_set_title (session *sess)
-{
-	char tbuf[512];
-	int type;
-
-	if (sess->gui->is_tab && sess != current_tab)
-		return;
-
-	type = sess->type;
-
-	if (sess->server->connected == FALSE && sess->type != SESS_DIALOG)
-		goto def;
-
-	switch (type)
-	{
-	case SESS_DIALOG:
-		g_snprintf (tbuf, sizeof (tbuf), "%s %s @ %s - %s",
-					 _("Dialog with"), sess->channel, server_get_network (sess->server, TRUE),
-					 _(DISPLAY_NAME));
+	case COL_DEFAULT:
+		color = &gui->tab_color_default;
 		break;
-	case SESS_SERVER:
-		g_snprintf (tbuf, sizeof (tbuf), "%s%s%s - %s",
-					 prefs.hex_gui_win_nick ? sess->server->nick : "",
-					 prefs.hex_gui_win_nick ? " @ " : "", server_get_network (sess->server, TRUE),
-					 _(DISPLAY_NAME));
+	case COL_SELECTED:
+		color = &gui->tab_color_selected;
 		break;
-	case SESS_CHANNEL:
-		/* don't display keys in the titlebar */
-			g_snprintf (tbuf, sizeof (tbuf),
-					 "%s%s%s / %s%s%s%s - %s",
-					 prefs.hex_gui_win_nick ? sess->server->nick : "",
-					 prefs.hex_gui_win_nick ? " @ " : "",
-					 server_get_network (sess->server, TRUE), sess->channel,
-					 prefs.hex_gui_win_modes && sess->current_modes ? " (" : "",
-					 prefs.hex_gui_win_modes && sess->current_modes ? sess->current_modes : "",
-					 prefs.hex_gui_win_modes && sess->current_modes ? ")" : "",
-					 _(DISPLAY_NAME));
-		if (prefs.hex_gui_win_ucount)
-		{
-			g_snprintf (tbuf + strlen (tbuf), 9, " (%d)", sess->total);
-		}
+	case COL_HIGHLIGHT:
+		color = &gui->tab_color_highlight;
 		break;
-	case SESS_NOTICES:
-	case SESS_SNOTICES:
-		g_snprintf (tbuf, sizeof (tbuf), "%s%s%s (notices) - %s",
-					 prefs.hex_gui_win_nick ? sess->server->nick : "",
-					 prefs.hex_gui_win_nick ? " @ " : "", server_get_network (sess->server, TRUE),
-					 _(DISPLAY_NAME));
+	case COL_NEW_DATA:
+		color = &gui->tab_color_new_data;
 		break;
-	default:
-	def:
-		g_snprintf (tbuf, sizeof (tbuf), _(DISPLAY_NAME));
-		gtk_window_set_title (GTK_WINDOW (sess->gui->window), tbuf);
-		return;
+	case COL_NEW_MESSAGE:
+		color = &gui->tab_color_new_message;
+		break;
 	}
 
-	gtk_window_set_title (GTK_WINDOW (sess->gui->window), tbuf);
+	GtkStyleContext *context = gtk_widget_get_style_context(gui->tab_label);
+	GtkCssProvider *provider = gtk_css_provider_new();
+	gchar *css = g_strdup_printf("GtkLabel { background-color: #%02x%02x%02x; }",
+						 (int)(color->red * 255.0),
+						 (int)(color->green * 255.0),
+						 (int)(color->blue * 255.0));
+	gtk_css_provider_load_from_data(provider, css, -1, NULL);
+	gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(provider),
+						  GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+	g_object_unref(provider);
+	g_free(css);
+	gtk_widget_queue_draw (gui->tab_label);
 }
-
-static gboolean
-mg_windowstate_cb (GtkWindow *wid, GdkEventWindowState *event, gpointer userdata)
-{
-	if ((event->changed_mask & GDK_WINDOW_STATE_ICONIFIED) &&
-		 (event->new_window_state & GDK_WINDOW_STATE_ICONIFIED) &&
-		 prefs.hex_gui_tray_minimize && prefs.hex_gui_tray &&
-		 gtkutil_tray_icon_supported (wid))
-	{
-		tray_toggle_visibility (TRUE);
-		gtk_window_deiconify (wid);
-	}
-
-	prefs.hex_gui_win_state = 0;
-	if (event->new_window_state & GDK_WINDOW_STATE_MAXIMIZED)
-		prefs.hex_gui_win_state = 1;
-
-	prefs.hex_gui_win_fullscreen = 0;
-	if (event->new_window_state & GDK_WINDOW_STATE_FULLSCREEN)
-		prefs.hex_gui_win_fullscreen = 1;
-
-	menu_set_fullscreen (current_sess->gui, prefs.hex_gui_win_fullscreen);
-
-	return FALSE;
-}
-
-static gboolean
-mg_configure_cb (GtkWidget *wid, GdkEventConfigure *event, session *sess)
-{
-	if (sess == NULL)			/* for the main_window */
-	{
-		if (mg_gui)
-		{
-			if (prefs.hex_gui_win_save && !prefs.hex_gui_win_state && !prefs.hex_gui_win_fullscreen)
-			{
-				sess = current_sess;
-				gtk_window_get_position (GTK_WINDOW (wid), &prefs.hex_gui_win_left,
-												 &prefs.hex_gui_win_top);
-				gtk_window_get_size (GTK_WINDOW (wid), &prefs.hex_gui_win_width,
-											&prefs.hex_gui_win_height);
-			}
-		}
-	}
-
-	if (sess)
-	{
-		if (sess->type == SESS_DIALOG && prefs.hex_gui_win_save)
-		{
-			gtk_window_get_position (GTK_WINDOW (wid), &prefs.hex_gui_dialog_left,
-											 &prefs.hex_gui_dialog_top);
-			gtk_window_get_size (GTK_WINDOW (wid), &prefs.hex_gui_dialog_width,
-										&prefs.hex_gui_dialog_height);
-		}
-	}
-
-	return FALSE;
-}
-
-/* move to a non-irc tab */
-
-static void
-mg_show_generic_tab (GtkWidget *box)
-{
-	int num;
-	GtkWidget *f = NULL;
-
-	if (current_sess && gtk_widget_has_focus (current_sess->gui->input_box))
-		f = current_sess->gui->input_box;
-
-	num = gtk_notebook_page_num (GTK_NOTEBOOK (mg_gui->note_book), box);
-	gtk_notebook_set_current_page (GTK_NOTEBOOK (mg_gui->note_book), num);
-	gtk_tree_view_set_model (GTK_TREE_VIEW (mg_gui->user_tree), NULL);
-	gtk_window_set_title (GTK_WINDOW (mg_gui->window),
-								 g_object_get_data (G_OBJECT (box), "title"));
-	gtk_widget_set_sensitive (mg_gui->menu, FALSE);
-
-	if (f)
-		gtk_widget_grab_focus (f);
-}
-
-/* a channel has been focused */
 
 static void
 mg_focus (session *sess)
@@ -1118,16 +835,30 @@ mg_menu_destroy (GtkWidget *menu, gpointer userdata)
 }
 
 void
-mg_create_icon_item (char *label, char *stock, GtkWidget *menu,
-							void *callback, void *userdata)
+mg_create_icon_item (char *label, char *icon_name, GtkWidget *menu,
+						void *callback, void *userdata)
 {
 	GtkWidget *item;
+	GtkWidget *box;
+	GtkWidget *image;
+	GtkWidget *label_widget;
 
-	item = create_icon_menu (label, stock, TRUE);
-	gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
-	g_signal_connect (G_OBJECT (item), "activate", G_CALLBACK (callback),
-							userdata);
-	gtk_widget_show (item);
+	item = gtk_menu_item_new();
+	box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+	gtk_container_add(GTK_CONTAINER(item), box);
+
+	if (icon_name && *icon_name) {
+		image = gtk_image_new_from_icon_name(icon_name, GTK_ICON_SIZE_MENU);
+		gtk_box_pack_start(GTK_BOX(box), image, FALSE, FALSE, 0);
+	}
+
+	label_widget = gtk_label_new_with_mnemonic(label);
+	gtk_label_set_use_underline(GTK_LABEL(label_widget), TRUE);
+	gtk_box_pack_start(GTK_BOX(box), label_widget, TRUE, TRUE, 0);
+
+	gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+	g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(callback), userdata);
+	gtk_widget_show_all(item);
 }
 
 static int

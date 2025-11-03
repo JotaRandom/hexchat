@@ -27,8 +27,20 @@
 #include "fe-gtk.h"
 
 #include <gdk/gdkkeysyms.h>
+#include <gdk/gdkx.h>
 #if defined (WIN32) || defined (__APPLE__)
 #include <pango/pangocairo.h>
+#endif
+
+/* GTK3 compatibility */
+#if GTK_CHECK_VERSION(3,0,0)
+#define gtk_hbox_new(X,Y) gtk_box_new(GTK_ORIENTATION_HORIZONTAL, Y)
+#define gtk_vbox_new(X,Y) gtk_box_new(GTK_ORIENTATION_VERTICAL, Y)
+#define gtk_hpaned_new() gtk_paned_new(GTK_ORIENTATION_HORIZONTAL)
+#define gtk_vpaned_new() gtk_paned_new(GTK_ORIENTATION_VERTICAL)
+#define gtk_hseparator_new() gtk_separator_new(GTK_ORIENTATION_HORIZONTAL)
+#define gtk_vseparator_new() gtk_separator_new(GTK_ORIENTATION_VERTICAL)
+#define gdk_cursor_new(X) gdk_cursor_new_for_display(gdk_display_get_default(), X)
 #endif
 
 #ifdef GDK_WINDOWING_X11
@@ -515,40 +527,47 @@ fe_get_bool (char *title, char *prompt, void *callback, void *userdata)
 }
 
 GtkWidget *
-gtkutil_button (GtkWidget *box, char *stock, char *tip, void *callback,
+gtkutil_button (GtkWidget *box, char *icon_name, char *tip, void *callback,
 					 void *userdata, char *labeltext)
 {
-	GtkWidget *wid, *img, *bbox;
+	GtkWidget *button;
 
-	wid = gtk_button_new ();
-
-	if (labeltext)
+	if (icon_name && *icon_name)
 	{
-		gtk_button_set_label (GTK_BUTTON (wid), labeltext);
-		gtk_button_set_image (GTK_BUTTON (wid), gtk_image_new_from_icon_name (stock, GTK_ICON_SIZE_MENU));
-		gtk_button_set_use_underline (GTK_BUTTON (wid), TRUE);
-		if (box)
-			gtk_container_add (GTK_CONTAINER (box), wid);
+		if (labeltext)
+		{
+			button = gtk_button_new_with_mnemonic (labeltext);
+			GtkWidget *img = gtk_image_new_from_icon_name (icon_name, GTK_ICON_SIZE_BUTTON);
+			gtk_button_set_image (GTK_BUTTON (button), img);
+		} else
+		{
+			button = gtk_button_new ();
+			GtkWidget *img = gtk_image_new_from_icon_name (icon_name, GTK_ICON_SIZE_BUTTON);
+			gtk_button_set_image (GTK_BUTTON (button), img);
+		}
 	}
 	else
 	{
-		bbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-		gtk_container_add (GTK_CONTAINER (wid), bbox);
-		gtk_widget_show (bbox);
-
-		img = gtk_image_new_from_icon_name (stock, GTK_ICON_SIZE_MENU);
-		gtk_container_add (GTK_CONTAINER (bbox), img);
-		gtk_widget_show (img);
-		gtk_box_pack_start (GTK_BOX (box), wid, 0, 0, 0);
+		button = gtk_button_new_with_mnemonic (labeltext);
 	}
 
-	g_signal_connect (G_OBJECT (wid), "clicked",
-							G_CALLBACK (callback), userdata);
-	gtk_widget_show (wid);
 	if (tip)
-		gtk_widget_set_tooltip_text (wid, tip);
+		gtk_widget_set_tooltip_text (button, tip);
 
-	return wid;
+	if (callback)
+		g_signal_connect (G_OBJECT (button), "clicked",
+				  G_CALLBACK (callback), userdata);
+
+	if (box)
+	{
+#if GTK_CHECK_VERSION(3,0,0)
+		gtk_box_pack_start (GTK_BOX (box), button, FALSE, FALSE, 0);
+#else
+		gtk_container_add (GTK_CONTAINER (box), button);
+#endif
+	}
+
+	return button;
 }
 
 void
@@ -560,16 +579,29 @@ gtkutil_label_new (char *text, GtkWidget * box)
 }
 
 GtkWidget *
-gtkutil_entry_new (int max, GtkWidget * box, void *callback,
+gtkutil_entry_new (int max, GtkWidget *box, void *callback,
 						 gpointer userdata)
 {
-	GtkWidget *entry = gtk_entry_new ();
-	gtk_entry_set_max_length (GTK_ENTRY (entry), max);
-	gtk_container_add (GTK_CONTAINER (box), entry);
+	GtkWidget *entry;
+
+	entry = gtk_entry_new ();
+
+	if (max > 0)
+		gtk_entry_set_max_length (GTK_ENTRY (entry), max);
+
 	if (callback)
-		g_signal_connect (G_OBJECT (entry), "changed",
-								G_CALLBACK (callback), userdata);
-	gtk_widget_show (entry);
+		g_signal_connect (G_OBJECT (entry), "activate",
+				  G_CALLBACK (callback), userdata);
+
+	if (box)
+	{
+#if GTK_CHECK_VERSION(3,0,0)
+		gtk_box_pack_start (GTK_BOX (box), entry, TRUE, TRUE, 0);
+#else
+		gtk_container_add (GTK_CONTAINER (box), entry);
+#endif
+	}
+
 	return entry;
 }
 
@@ -583,12 +615,12 @@ show_and_unfocus (GtkWidget * wid)
 void
 gtkutil_set_icon (GtkWidget *win)
 {
-#ifndef WIN32
-	/* FIXME: Magically breaks icon rendering in most
-	 * (sub)windows, but OFC only on Windows. GTK <3
-	 */
-	gtk_window_set_icon (GTK_WINDOW (win), pix_hexchat);
-#endif
+	GdkPixbuf *pixbuf = get_pixmap ("hexchat.png");
+	if (pixbuf)
+	{
+		gtk_window_set_icon (GTK_WINDOW (win), pixbuf);
+		g_object_unref (pixbuf);
+	}
 }
 
 extern GtkWidget *parent_window;	/* maingui.c */
@@ -599,21 +631,24 @@ gtkutil_window_new (char *title, char *role, int width, int height, int flags)
 	GtkWidget *win;
 
 	win = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-	gtkutil_set_icon (win);
-#ifdef WIN32
-	gtk_window_set_wmclass (GTK_WINDOW (win), "HexChat", "hexchat");
+
+	if (title)
+		gtk_window_set_title (GTK_WINDOW (win), title);
+
+#if !GTK_CHECK_VERSION(3,0,0)
+	if (role)
+		gtk_window_set_role (GTK_WINDOW (win), role);
 #endif
-	gtk_window_set_title (GTK_WINDOW (win), title);
-	gtk_window_set_default_size (GTK_WINDOW (win), width, height);
-	gtk_window_set_role (GTK_WINDOW (win), role);
+
+	if (width > 0 && height > 0)
+	{
+		gtk_window_set_default_size (GTK_WINDOW (win), width, height);
+	}
+
 	if (flags & 1)
 		gtk_window_set_position (GTK_WINDOW (win), GTK_WIN_POS_MOUSE);
-	if ((flags & 2) && parent_window)
-	{
-		gtk_window_set_type_hint (GTK_WINDOW (win), GDK_WINDOW_TYPE_HINT_DIALOG);
-		gtk_window_set_transient_for (GTK_WINDOW (win), GTK_WINDOW (parent_window));
-		gtk_window_set_destroy_with_parent (GTK_WINDOW (win), TRUE);
-	}
+
+	gtk_container_set_border_width (GTK_CONTAINER (win), 6);
 
 	return win;
 }
@@ -623,25 +658,18 @@ void
 gtkutil_copy_to_clipboard (GtkWidget *widget, GdkAtom selection,
                            const gchar *str)
 {
-	GtkWidget *win;
-	GtkClipboard *clip, *clip2;
+	GtkClipboard *clipboard;
 
-	win = gtk_widget_get_toplevel (GTK_WIDGET (widget));
-	if (gtk_widget_is_toplevel (win))
+	if (str == NULL || *str == 0)
+		return;
+
+	if (selection == GDK_NONE)
 	{
-		int len = strlen (str);
-
-		if (selection)
+#ifdef GDK_WINDOWING_X11
+		if (GDK_IS_X11_DISPLAY (gdk_display_get_default ()))
 		{
-			clip = gtk_widget_get_clipboard (win, selection);
-			gtk_clipboard_set_text (clip, str, len);
-		} else
-		{
-			/* copy to both primary X selection and clipboard */
-			clip = gtk_widget_get_clipboard (win, GDK_SELECTION_PRIMARY);
-			clip2 = gtk_widget_get_clipboard (win, GDK_SELECTION_CLIPBOARD);
-			gtk_clipboard_set_text (clip, str, len);
-			gtk_clipboard_set_text (clip2, str, len);
+			gtk_clipboard_set_text (gtk_clipboard_get (GDK_SELECTION_PRIMARY),
+					  str, -1);
 		}
 	}
 }
